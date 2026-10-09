@@ -27,7 +27,8 @@ def connect(database_url):
 
 def init_db(database_url):
     with connect(database_url) as conn, conn.transaction():
-        conn.execute(files("bikeshare").joinpath("schema.sql").read_text(encoding="utf-8"))
+        for name in ("schema.sql", "ttc_schema.sql"):
+            conn.execute(files("bikeshare").joinpath(name).read_text(encoding="utf-8"))
 
 
 def payload_hash(payload):

@@ -22,4 +22,10 @@ def settings():
         conn.execute("DROP TRIGGER IF EXISTS reject_test_write ON normalized.observations")
         conn.execute("TRUNCATE ops.ingestion_runs CASCADE")
         conn.execute("TRUNCATE ops.source_backoff, ops.transformation_runs")
+        conn.execute(
+            """TRUNCATE normalized.ttc_gtfs_versions, raw.ttc_realtime_snapshots,
+               normalized.ttc_train_stop_events, normalized.ttc_current_predictions,
+               normalized.ttc_alerts, ops.ttc_poll_runs, ops.ttc_feed_state,
+               ops.ttc_static_refreshes CASCADE"""
+        )
     return Settings(url)

@@ -14,6 +14,7 @@ dependencies = [
   "pillow==12.3.0", # Security fixes for Streamlit's image dependency.
   "pandas==2.3.3",
   "tzdata==2025.2",
+  "gtfs-realtime-bindings==2.2.0",
 ]
 
 [project.scripts]

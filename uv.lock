@@ -169,6 +169,18 @@ wheels = [
 ]
 
 [[package]]
+name = "gtfs-realtime-bindings"
+version = "2.2.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "protobuf" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/42/63/3e3d190df599b6d25e2c0793f6653bb696c1be8480263ef417ea70a40f25/gtfs_realtime_bindings-2.2.0.tar.gz", hash = "sha256:1e184075ff6aae1f8e8c91ae28eb946af5e5b656b743a41a7bca37818784886b", size = 12013, upload-time = "2026-07-29T19:12:47.132Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/77/14/a73fbb70b7948cd2d2f1c48846889fc6c944a6aede25a31d8111a1d48dcf/gtfs_realtime_bindings-2.2.0-py3-none-any.whl", hash = "sha256:4f222a962bcb8715d9305cc08e7f7662cc70e7479f377e2694439a50724bc676", size = 11297, upload-time = "2026-07-29T19:12:46.089Z" },
+]
+
+[[package]]
 name = "h11"
 version = "0.16.0"
 source = { registry = "https://pypi.org/simple" }
@@ -700,6 +712,7 @@ name = "toronto-bikeshare-monitor"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "gtfs-realtime-bindings" },
     { name = "httpx" },
     { name = "pandas" },
     { name = "pillow" },
@@ -719,6 +732,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "gtfs-realtime-bindings", specifier = "==2.2.0" },
     { name = "httpx", specifier = "==0.28.1" },
     { name = "pandas", specifier = "==2.3.3" },
     { name = "pillow", specifier = "==12.3.0" },
