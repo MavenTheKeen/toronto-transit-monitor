@@ -13,13 +13,13 @@ if sys.platform == "win32":
     )
 pytest.importorskip("airflow.sdk", reason="Install the isolated Airflow test environment")
 
-from airflow.models.dagbag import DagBag  # noqa: E402
+from airflow.dag_processing.dagbag import DagBag  # noqa: E402
 
 
 @pytest.fixture(scope="module")
 def monitor_dag():
     folder = Path(__file__).resolve().parents[1] / "dags"
-    bag = DagBag(dag_folder=str(folder), include_examples=False, safe_mode=False)
+    bag = DagBag(dag_folder=str(folder), safe_mode=False)
     assert bag.import_errors == {}
     assert set(bag.dags) == {"toronto_bikeshare_reliability"}
     return bag.dags["toronto_bikeshare_reliability"]
@@ -37,7 +37,7 @@ def test_real_dag_import_and_scheduling_safety(monitor_dag):
     for task in monitor_dag.tasks:
         assert task.retries == 2
         assert task.retry_delay == timedelta(minutes=2)
-        assert task.retry_exponential_backoff is True
+        assert task.retry_exponential_backoff == 2.0
         assert task.max_retry_delay == timedelta(minutes=5)
         assert task.execution_timeout == timedelta(minutes=12)
 

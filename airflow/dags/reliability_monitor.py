@@ -34,7 +34,7 @@ with DAG(
     default_args={
         "retries": 2,
         "retry_delay": timedelta(minutes=2),
-        "retry_exponential_backoff": True,
+        "retry_exponential_backoff": 2.0,
         "max_retry_delay": timedelta(minutes=5),
         "execution_timeout": timedelta(minutes=12),
     },
