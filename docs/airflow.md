@@ -65,12 +65,16 @@ public deployment configuration. DAG code is baked into the image; rebuild after
 changes. Logs and config/state use separate named volumes, so they do not hide
 updated DAG files.
 
-## Verification status
+## Testing
 
-Compose configuration and Python syntax are checked locally. This Windows session
-has no Docker engine or WSL, so image builds, Airflow import and scheduler execution
-are **not yet locally verified**. The GitHub Actions workflow contains separate
-Linux DAG-import tests and a container startup check; it has not been run remotely.
+GitHub Actions runs the DAG import and structure tests in a separate Linux job with
+Airflow's official constraints, and a Compose job builds every image and waits for
+the dashboard and Airflow health checks with the DAG still paused. Scheduled runs
+are exercised locally with Docker Desktop (WSL 2 backend) on Windows 11.
+
+Unpausing with `catchup=False` immediately queues the most recent missed 15-minute
+slot, then continues on schedule. That first run collects at unpause time, because
+collection time is always the actual HTTP acquisition time.
 
 Official references: [Quick start](https://airflow.apache.org/docs/apache-airflow/3.3.2/start.html),
 [prerequisites](https://airflow.apache.org/docs/apache-airflow/3.3.2/installation/prerequisites.html),

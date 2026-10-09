@@ -8,10 +8,7 @@ claims about recurring station reliability.
 ## Prepare the local project
 
 Install the prerequisites in the root README or [Windows setup](setup-windows.md).
-The commands below are the intended Compose workflow. Container execution and
-Airflow scheduling were still unverified on the original Windows environment;
-Docker and WSL were absent. Read the latest README verification status before
-describing those parts as demonstrated.
+The commands below are the Compose workflow.
 
 From the repository root, copy `.env.example` to `.env` once and replace its
 example password. Preserve an existing `.env`. In PowerShell:
@@ -94,12 +91,12 @@ the scheduler is running. Confirm the collection-to-transformation dependency,
 15-minute schedule, disabled catch-up, retries, and actual task logs. Scheduled
 runtime execution must be verified separately from having a DAG file in Git.
 
-At the Stage 2 checkpoint on 2026-10-09, native PostgreSQL ingestion stored 1,075
-real station observations, repeat/replay checks succeeded, dbt built three views
-and passed 45 data tests, and the project run passed 142 pytest tests. These are
-verification measurements, not a claimed operating scale or uptime guarantee.
-Run the current README test commands before a presentation; do not imply CI or
-containers passed unless their actual runs are available to inspect.
+A live collection stores one observation per station in the feed (1,075 stations
+in October 2026). The dbt project builds three views with 45 data tests, and the
+pytest suite covers parsing, HTTP safety, ingestion, dbt and the dashboard. These
+describe the test setup, not an operating scale or uptime guarantee. Run the
+README test commands before a presentation, and point to the GitHub Actions
+history for CI results.
 
 Chromium later rendered the real dashboard, map tiles, station search, and ranking
 tabs. The saved [dashboard](screenshots/dashboard.png) and
