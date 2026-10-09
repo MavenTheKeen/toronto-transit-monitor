@@ -18,12 +18,34 @@ from airflow.sdk.definitions.timetables.trigger import CronTriggerTimetable  # n
 
 
 @pytest.fixture(scope="module")
-def monitor_dag():
+def dag_bag():
     folder = Path(__file__).resolve().parents[1] / "dags"
     bag = DagBag(dag_folder=str(folder), safe_mode=False)
     assert bag.import_errors == {}
-    assert set(bag.dags) == {"toronto_bikeshare_reliability"}
-    return bag.dags["toronto_bikeshare_reliability"]
+    assert set(bag.dags) == {"toronto_bikeshare_reliability", "ttc_static_gtfs"}
+    return bag
+
+
+@pytest.fixture(scope="module")
+def monitor_dag(dag_bag):
+    return dag_bag.dags["toronto_bikeshare_reliability"]
+
+
+def test_ttc_static_refresh_is_daily_and_shell_free(dag_bag, monkeypatch):
+    dag = dag_bag.dags["ttc_static_gtfs"]
+    assert dag.catchup is False
+    assert dag.is_paused_upon_creation is True
+    assert isinstance(dag.timetable, CronTriggerTimetable)
+    assert dag.timetable.expression == "0 9 * * *"
+    refresh = dag.get_task("refresh").python_callable
+    calls = []
+    monkeypatch.setattr(
+        refresh.__globals__["subprocess"], "run", lambda args, **kw: calls.append((args, kw))
+    )
+    refresh()
+    assert calls == [
+        (["/opt/app-venv/bin/bikeshare", "ttc-gtfs-refresh"], {"check": True, "timeout": 840})
+    ]
 
 
 def test_real_dag_import_and_scheduling_safety(monitor_dag):
