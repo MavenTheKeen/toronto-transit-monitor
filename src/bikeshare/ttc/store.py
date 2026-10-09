@@ -16,6 +16,10 @@ EVENT_LOCK_ID = locks.TTC_EVENT_MATCHING
 # within 10 minutes of an existing visit for the same train and platform is that visit.
 VISIT_MATCH_WINDOW = timedelta(minutes=10)
 LOOKBACK = timedelta(hours=3)
+# A dropped platform counts as passed only if the train was due within this time when
+# last listed, and only for visits listed recently (older ones span a collection gap).
+PASSED_DUE = timedelta(minutes=2)
+PASSED_RECENT = timedelta(minutes=10)
 
 
 def active_feed_version(conn) -> str | None:
@@ -206,13 +210,16 @@ def _normalize_trips(conn, raw, snapshot, stops):
                WHERE event_id = %(event_id)s""",
             updates,
         )
-        # A train still in the feed that no longer lists a platform has passed it.
+        # A visit no longer listed has passed if the train was due there when last listed,
+        # whether or not the train is still in the feed (it may have reached its terminal
+        # or changed label). A platform dropped well before its predicted time was a
+        # withdrawn prediction (short turn, reroute), not an arrival.
         cur.execute(
             """UPDATE normalized.ttc_train_stop_events
                SET passed_at = least(coalesce(passed_at, %(seen)s), %(seen)s)
-               WHERE train_id = ANY(%(trains)s) AND last_seen_at < %(seen)s
-                 AND predicted_arrival > %(seen)s - %(lookback)s""",
-            {"seen": seen_at, "trains": trains, "lookback": LOOKBACK},
+               WHERE last_seen_at < %(seen)s AND last_seen_at > %(seen)s - %(recent)s
+                 AND predicted_arrival <= last_seen_at + %(due)s""",
+            {"seen": seen_at, "recent": PASSED_RECENT, "due": PASSED_DUE},
         )
         if _claim_newest(conn, raw):
             cur.execute("DELETE FROM normalized.ttc_current_predictions")

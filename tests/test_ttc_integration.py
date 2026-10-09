@@ -102,6 +102,36 @@ def test_platform_dropped_while_trip_continues_is_marked_passed(conn):
     )
 
 
+def test_early_drop_is_not_an_arrival_but_a_departed_train_is(conn):
+    t1, t2 = T0, T0 + timedelta(seconds=30)
+    first = trip_feed(
+        t1,
+        [
+            # Due at College in 10 minutes, then the platform is withdrawn (short turn).
+            {
+                "trip_id": "1",
+                "vehicle": "838",
+                "route_id": "1",
+                "stops": [("13806", 3, 20), ("13807", 4, 600)],
+            },
+            # Due at Wellesley now, then the train leaves the feed (e.g. at a terminal).
+            {"trip_id": "2", "vehicle": "131", "route_id": "1", "stops": [("13806", 3, 30)]},
+        ],
+    )
+    later = trip_feed(
+        t2, [{"trip_id": "1", "vehicle": "838", "route_id": "1", "stops": [("13808", 1, 60)]}]
+    )
+    ingest(conn, "trips_subway", first, t1)
+    ingest(conn, "trips_subway", later, t2)
+    rows = conn.execute(
+        "SELECT train_id, stop_id, passed_at FROM normalized.ttc_train_stop_events"
+    ).fetchall()
+    passed = {(r["train_id"], r["stop_id"]): r["passed_at"] for r in rows}
+    assert passed[("838", "13806")] == t2
+    assert passed[("838", "13807")] is None  # Withdrawn 10 minutes early: not an arrival.
+    assert passed[("131", "13806")] == t2  # Train gone from the feed, but it was due.
+
+
 def test_churning_trip_ids_for_one_train_are_one_visit(conn):
     # Observed live: the same train (vehicle 118) gets a new trip_id on most polls.
     for n, offset in enumerate((0, 30, 60)):

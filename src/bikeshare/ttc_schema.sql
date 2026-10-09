@@ -132,6 +132,8 @@ CREATE INDEX IF NOT EXISTS ttc_events_stop_time
   ON normalized.ttc_train_stop_events (stop_id, predicted_arrival);
 CREATE INDEX IF NOT EXISTS ttc_events_line_time
   ON normalized.ttc_train_stop_events (route_id, direction_id, predicted_arrival);
+CREATE INDEX IF NOT EXISTS ttc_events_last_seen
+  ON normalized.ttc_train_stop_events (last_seen_at);
 
 -- Predictions from the newest normalized trip snapshot only (replaced each poll).
 CREATE TABLE IF NOT EXISTS normalized.ttc_current_predictions (
