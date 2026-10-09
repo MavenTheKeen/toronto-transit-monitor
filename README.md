@@ -11,16 +11,32 @@ actually is:
 Both pipelines land raw responses in PostgreSQL, validate and normalize them in a
 separate step that can be replayed from storage, and feed dbt models for reliability
 metrics. Two front ends read the results: **Toronto Transit Now**, a public-facing,
-mobile-first site (service status, live line diagrams, station arrivals, a subway and
-Bike Share map, reliability analytics, a pipeline status page and daily open-data
-downloads), and a Streamlit dashboard for Bike Share operations.
+mobile-first site, and a Streamlit dashboard for Bike Share operations.
+
+What the site shows:
+
+- **Service status and live lines:** current disruptions, a diagram of each subway line
+  with estimated train positions, and arrivals at every station.
+- **Map:** subway stations and every Bike Share dock with live bike and dock counts,
+  plus nearest docks to a station or to you.
+- **Reliability:** observed gaps between trains against the schedule, the longest gaps,
+  and elevator and escalator outages.
+- **Pipeline status:** whether each feed, collection and dbt build is healthy, how many
+  records validation rejected, and how often the TTC feed drops out.
+- **Open data:** daily Parquet and CSV downloads of every observed gap and dock reading,
+  with checksums, column descriptions and the licence.
+
+The project also loads TTC's official monthly delay log, so the gaps it detects can be
+checked against incidents TTC itself recorded.
 
 **Status:** runs locally with Docker Compose and has collected real data since
 2026-10-09. It is not publicly hosted yet.
 
-| Service status | Line 1 | Map | Reliability | Bike Share dashboard |
+| Service status | Line 1 | Map | Reliability | Pipeline status |
 | --- | --- | --- | --- | --- |
-| ![Service status](docs/screenshots/site-home.png) | ![Line 1 diagram](docs/screenshots/site-line1.png) | ![Subway and Bike Share map](docs/screenshots/site-map.png) | ![Reliability](docs/screenshots/site-reliability.png) | ![Dashboard](docs/screenshots/dashboard.png) |
+| ![Service status](docs/screenshots/site-home.png) | ![Line 1 diagram](docs/screenshots/site-line1.png) | ![Subway and Bike Share map](docs/screenshots/site-map.png) | ![Reliability](docs/screenshots/site-reliability.png) | ![Pipeline status](docs/screenshots/site-pipeline.png) |
+
+![Bike Share dashboard](docs/screenshots/dashboard.png)
 
 ## Architecture
 
@@ -29,9 +45,12 @@ flowchart LR
     TTCRT[TTC GTFS-Realtime<br/>trips, alerts, accessibility] --> TTCC[TTC collector<br/>every 30 s]
     TTCS[TTC static GTFS] --> TTCC
     GBFS[Bike Share GBFS 3.0] --> BSC[Bike Share collector<br/>every 15 min]
+    Log[TTC official delay log<br/>monthly CSV] --> Raw
     Airflow[Airflow] --> BSC
     Airflow --> dbt
     Airflow --> TTCS
+    Airflow --> Log
+    Airflow --> Export[Daily export]
     TTCC --> Raw[(PostgreSQL raw)]
     BSC --> Raw
     Raw --> Norm[Validated normalization<br/>replayable from raw]
@@ -43,6 +62,9 @@ flowchart LR
     Normalized --> API[FastAPI read-only API<br/>15 s cache, rate limit]
     dbt --> API
     API --> Site[Toronto Transit Now<br/>HTML/CSS/JS]
+    dbt --> Export
+    Export --> Files[Open-data files<br/>Parquet, CSV]
+    Files --> Site
     Normalized --> Dash[Streamlit dashboard]
     dbt --> Dash
 ```
@@ -71,6 +93,25 @@ is handled in code, tested, and documented:
 - **A successful Bike Share response can hold stale dock readings.** Collection time,
   publication time and each dock's own report time are tracked separately, and stale
   readings make no availability claim. [Details](docs/metrics.md#time-and-freshness)
+- **TTC's own delay log is free text.** Station names are cut at 22 characters, use old
+  names (Dundas for TMU) and abbreviations, or name a section between two stations;
+  99.4% of incidents with a gap between trains match a station, and the rest are yards.
+  The city's code descriptions are double-encoded UTF-8 and are repaired on load.
+  [Details](docs/ttc.md#official-delay-log)
+
+## Engineering notes
+
+- **Replayable raw storage, kept small.** Bike Share responses are stored once per
+  distinct body (content-addressed by SHA-256), and station details are versioned
+  instead of repeated in every reading. On the first day's data, Bike Share storage went
+  from 36.4 MB to 8.0 MB, and views still return every payload and row exactly as
+  before. [Details](docs/bikeshare.md#storage-layout)
+- **Versioned schema changes.** Numbered SQL migrations apply once, in a transaction,
+  under an advisory lock, and are recorded in `ops.schema_migrations`.
+- **Read-only website.** The site connects as a database role that can only read, with
+  a 15-second cache and a per-IP rate limit in front of it.
+- **Observable.** Every collection, rejected record, data-quality check and dbt test
+  result is stored in `ops`, which feeds the pipeline status page.
 
 ## Quick start
 
@@ -96,7 +137,8 @@ docker compose up -d dashboard
 The TTC collector loads the static schedule on first start, then polls every 30
 seconds. Reliability analytics appear after a dbt build that includes observed arrivals.
 
-To schedule Bike Share collection, dbt builds and the daily schedule refresh:
+To schedule Bike Share collection and dbt builds, plus the daily schedule refresh,
+open-data export and delay-log refresh:
 
 ```powershell
 docker compose --profile airflow build airflow
@@ -125,9 +167,10 @@ Do not add `--volumes` unless you intend to delete the collected history.
 | `src/transit/ttc/` | TTC GTFS-Realtime and static GTFS collection, validation, storage, retention |
 | `src/transit/bikeshare/` | Bike Share GBFS collection, validation, storage, dashboard queries |
 | `src/transit/web/` | FastAPI app and the static site (plain HTML/CSS/JS, no build step) |
-| `src/transit/` | Shared CLI (`transit`), database setup, HTTP client, locks, dbt runner |
+| `src/transit/` | Shared CLI (`transit`), database setup, HTTP client, locks, dbt runner, open-data export |
+| `src/transit/migrations/` | Numbered schema migrations |
 | `dbt/` | Staging and analytics models and tests for both pipelines |
-| `airflow/` | DAGs for Bike Share collection + dbt, and the daily schedule refresh |
+| `airflow/` | DAGs for Bike Share collection + dbt, the schedule refresh, open-data export and delay log |
 | `dashboard/` | Streamlit Bike Share dashboard |
 | `tests/` | Unit and PostgreSQL integration tests, real-data fixtures |
 
