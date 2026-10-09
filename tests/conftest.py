@@ -28,4 +28,8 @@ def settings():
                normalized.ttc_alerts, ops.ttc_poll_runs, ops.ttc_feed_state,
                ops.ttc_static_refreshes CASCADE"""
         )
+        # Incremental dbt models keep history between builds by design; tests start empty.
+        for table in ("analytics.ttc_headways", "analytics.ttc_scheduled_service"):
+            if conn.execute("SELECT to_regclass(%s) AS t", (table,)).fetchone()["t"]:
+                conn.execute(f"TRUNCATE {table}")
     return Settings(url)

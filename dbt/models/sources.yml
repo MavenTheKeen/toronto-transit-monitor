@@ -31,6 +31,29 @@ sources:
                   arguments:
                     to: source('raw', 'feed_payloads')
                     field: raw_id
+      - name: ttc_gtfs_versions
+        description: One row per loaded TTC static GTFS zip (subway subset), keyed by its SHA-256.
+        columns:
+          - name: feed_version
+            data_tests:
+              - unique
+              - not_null
+      - name: ttc_line_stops
+        description: Platform order along each line direction for a feed version.
+      - name: ttc_stops
+      - name: ttc_trips
+      - name: ttc_stop_times
+      - name: ttc_calendar
+      - name: ttc_calendar_dates
+      - name: ttc_train_stop_events
+        description: One row per train visit to a platform, keyed by train (vehicle label).
+        columns:
+          - name: event_id
+            data_tests:
+              - unique
+              - not_null
+      - name: ttc_alerts
+      - name: ttc_alert_versions
   - name: ops
     schema: ops
     tables:
@@ -45,6 +68,10 @@ sources:
               - accepted_values:
                   arguments:
                     values: ['running', 'succeeded', 'failed']
+      - name: ttc_poll_runs
+        description: One row per TTC realtime feed poll.
+      - name: ttc_feed_state
+        description: The newest normalized snapshot per TTC feed.
   - name: raw
     schema: raw
     tables:
