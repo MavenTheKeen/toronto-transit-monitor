@@ -9,10 +9,11 @@ import psycopg
 from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
+from bikeshare import locks
 from bikeshare.config import FUTURE_TOLERANCE_SECONDS, STALE_SECONDS
 from bikeshare.parsing import FeedValidationError, parse_information, parse_status, timestamp
 
-LOCK_ID = 814_700_015  # One source/system per repository. Session lock spans HTTP and SQL.
+LOCK_ID = locks.BIKESHARE_COLLECTION  # Session lock spans HTTP and SQL.
 
 
 def connect(database_url):

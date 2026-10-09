@@ -6,13 +6,14 @@ import threading
 import time
 from datetime import UTC, datetime
 
+from bikeshare import locks
 from bikeshare.db import connect
 from bikeshare.http import FeedClient, FetchError
 from bikeshare.parsing import FeedValidationError
 from bikeshare.ttc import static_gtfs, store
 from bikeshare.ttc.sources import REALTIME_FEEDS, REALTIME_HOST, STATIC_GTFS_URL, STATIC_HOST
 
-COLLECTOR_LOCK_ID = 814_700_016  # One TTC collector per database.
+COLLECTOR_LOCK_ID = locks.TTC_COLLECTOR  # One TTC collector per database.
 RETENTION_EVERY_SECONDS = 3600
 
 

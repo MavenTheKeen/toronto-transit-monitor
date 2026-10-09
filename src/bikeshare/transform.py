@@ -10,9 +10,10 @@ from uuid import uuid4
 from psycopg.conninfo import conninfo_to_dict
 from psycopg.types.json import Jsonb
 
+from bikeshare import locks
 from bikeshare.db import connect
 
-TRANSFORM_LOCK = 814_700_016
+TRANSFORM_LOCK = locks.DBT_TRANSFORM
 
 
 def dbt_environment(database_url: str) -> dict[str, str]:

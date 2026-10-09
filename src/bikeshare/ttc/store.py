@@ -7,10 +7,11 @@ from datetime import UTC, datetime, timedelta
 
 from psycopg.types.json import Jsonb
 
+from bikeshare import locks
 from bikeshare.parsing import FeedValidationError
 from bikeshare.ttc import realtime
 
-EVENT_LOCK_ID = 814_700_017
+EVENT_LOCK_ID = locks.TTC_EVENT_MATCHING
 # A train revisits a platform at most once per round trip (20+ minutes), so a prediction
 # within 10 minutes of an existing visit for the same train and platform is that visit.
 VISIT_MATCH_WINDOW = timedelta(minutes=10)
