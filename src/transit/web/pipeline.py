@@ -158,6 +158,21 @@ def dbt(conn, now: datetime) -> dict:
     }
 
 
+def official_delays(conn) -> dict | None:
+    """The latest check of TTC's own delay log, and how far that log reaches."""
+    if conn.execute("SELECT to_regclass('ops.ttc_delay_refreshes') AS r").fetchone()["r"] is None:
+        return None
+    row = conn.execute(
+        """SELECT finished_at, status,
+                  (SELECT max(latest_delay_at) FROM ops.ttc_delay_refreshes
+                   WHERE status = 'loaded') AS log_reaches,
+                  (SELECT max(finished_at) FROM ops.ttc_delay_refreshes
+                   WHERE status = 'loaded') AS last_loaded
+           FROM ops.ttc_delay_refreshes ORDER BY refresh_id DESC LIMIT 1"""
+    ).fetchone()
+    return dict(row) if row else None
+
+
 def data_volume(conn) -> dict:
     counts = {
         name: r["rows"]
@@ -189,5 +204,6 @@ def pipeline_status(conn, now: datetime) -> dict:
         "overall": overall,
         "ttc": {"feeds": feeds, "dropouts_today": ttc_dropouts_today(conn, now)},
         **parts,
+        "official_delays": official_delays(conn),
         "data": data_volume(conn),
     }

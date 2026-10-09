@@ -115,3 +115,29 @@ models:
       - name: duration_minutes
         data_tests:
           - not_null
+
+  - name: stg_ttc_official_delays
+    description: TTC's logged subway incidents with service day, line and code description.
+    columns:
+      - name: source_id
+        data_tests:
+          - unique
+          - not_null
+
+  - name: ttc_delay_detection
+    description: >-
+      Each incident TTC logged with a gap between trains, at a matched station and line,
+      during this project's collection, with the longest gap this project observed at
+      that station and line around it. detected means the observed gap was at least 75%
+      of TTC's reported gap. Empty until TTC publishes a month this project collected.
+    columns:
+      - name: source_id
+        data_tests:
+          - unique
+          - not_null
+      - name: in_coverage
+        data_tests:
+          - not_null
+      - name: detected
+        data_tests:
+          - not_null

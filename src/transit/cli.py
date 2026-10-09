@@ -14,6 +14,7 @@ from transit.db import connect, ensure_readonly_role, init_db
 from transit.http import FeedClient, FetchError
 from transit.transform import run_transform
 from transit.ttc import collector as ttc_collector
+from transit.ttc import delays as ttc_delays
 from transit.ttc import realtime as ttc_realtime
 from transit.ttc import store as ttc_store
 from transit.ttc.sources import REALTIME_FEEDS, REALTIME_HOST
@@ -41,6 +42,10 @@ def main():
     commands.add_parser("ttc-retention", help="Delete expired TTC raw snapshots and history")
     commands.add_parser("ttc-smoke", help="Explicit live TTC parse check; writes no data")
     commands.add_parser("ttc-health", help="Exit 1 unless every TTC feed polled in 2 minutes")
+    delays = commands.add_parser(
+        "ttc-delays-refresh", help="Load TTC's official subway delay log if it changed"
+    )
+    delays.add_argument("--reload", action="store_true", help="Re-normalize even if unchanged")
     export = commands.add_parser("export", help="Write completed days as open-data files")
     export.add_argument("--out", default=os.environ.get("EXPORT_DIR", "exports"))
     export.add_argument(
@@ -124,6 +129,15 @@ def run_ttc(args, database_url):
             client.close()
         if result["status"] == "failed":
             raise FetchError(f"Static GTFS refresh failed: {result['error']}")
+        return result
+    if args.command == "ttc-delays-refresh":
+        client = FeedClient()
+        try:
+            result = ttc_delays.refresh(database_url, client, reload=args.reload)
+        finally:
+            client.close()
+        if result["status"] == "failed":
+            raise FetchError(f"Delay log refresh failed: {result['error']}")
         return result
     if args.command == "ttc-collect":
         if not args.once:

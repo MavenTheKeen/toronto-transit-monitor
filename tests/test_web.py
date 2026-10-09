@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 from tests.test_ingestion_integration import FixtureClient
 from tests.ttc_helpers import T0, alert_feed, static_zip, trip_feed
 from transit.bikeshare.ingestion import run
-from transit.db import connect
+from transit.db import connect, migrations
 from transit.ttc import static_gtfs, store
 from transit.web import pipeline, queries
 from transit.web.app import RateLimiter, TTLCache, create_app
@@ -349,7 +349,7 @@ def test_pipeline_endpoint_reports_each_part(client):
         "station_status_coverage"
     }
     assert body["dbt"]["status"] == "failing" and body["dbt"]["latest"] is None
-    assert body["data"]["schema_version"].startswith("0001")
+    assert body["data"]["schema_version"] == migrations()[-1][0]
 
 
 @pytest.mark.integration

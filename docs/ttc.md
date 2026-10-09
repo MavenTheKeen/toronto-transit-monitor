@@ -110,6 +110,27 @@ be no subway service ... nightly ..."). TTC gives these an active period coverin
 whole notice week, not the closure hours, so they must not be read as a current
 disruption. Derived fields are recomputed on replay, so rule changes apply to history.
 
+## Official delay log
+
+TTC publishes its own subway incident log on Toronto Open Data ("TTC Subway Delay Data",
+CSV, one row per incident: date, local time, station, delay code, minutes of delay,
+minutes of gap between trains, direction, line). It is updated monthly, a few weeks after
+each month ends. `transit ttc-delays-refresh` (daily in Airflow, `ttc_official_delays`)
+resolves the current download from the catalogue, stores each distinct download in
+`raw.ttc_delay_files`, and loads it into `normalized.ttc_official_delays` and
+`ttc_delay_codes` only when it changed; `--reload` re-normalizes the stored file. Every
+attempt is a row in `ops.ttc_delay_refreshes`.
+
+The station field is free text. Matching to station keys handles what the log actually
+contains: names cut at 22 characters (`PIONEER VILLAGE STATIO`), line suffixes
+(`KENNEDY BD STATION`), old names (`DUNDAS` is TMU, `EGLINTON WEST` is Cedarvale),
+abbreviations (`VMC`, `NORTH YORK CTR`), platform and approach wording, and sections
+(`UNION STATION TO KING`, matched to the first station and marked `range`). Yards and
+storage tracks stay unmatched. On the log as of 2026-09 (45,475 incidents since 2025),
+99.4% of incidents with a gap between trains match a station; each row records how it
+matched (`exact`, `alias`, `prefix`, `range`). The published code descriptions contain
+double-encoded UTF-8 (`â€"` for a dash), which is repaired on load.
+
 ## Retention
 
 Hourly, the collector deletes raw snapshots older than `TTC_RAW_RETENTION_DAYS`

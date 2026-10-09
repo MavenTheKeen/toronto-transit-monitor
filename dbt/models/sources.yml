@@ -76,6 +76,15 @@ sources:
               - not_null
       - name: ttc_alerts
       - name: ttc_alert_versions
+      - name: ttc_official_delays
+        description: TTC's official subway delay log (current download), stations matched to keys.
+        columns:
+          - name: source_id
+            data_tests:
+              - unique
+              - not_null
+      - name: ttc_delay_codes
+        description: TTC's descriptions of the delay codes in the log.
   - name: ops
     schema: ops
     tables:

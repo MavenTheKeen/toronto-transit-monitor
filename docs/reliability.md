@@ -43,6 +43,22 @@ threshold, no train is due within a minute, predictions are fresh, and there was
 collection gap since the last train. The message names the platform with the longest
 wait, e.g. "No southbound train at Bloor-Yonge in 11 min".
 
+## Checking against TTC's own log
+
+`analytics.ttc_delay_detection` pairs each incident in TTC's [official delay
+log](ttc.md#official-delay-log) with what this project observed. It takes incidents with
+a gap between trains, at a matched station and line, while the collector was running, and
+finds the longest observed gap at that station and line (and direction, when the log gives
+one) overlapping the incident: from 5 minutes before it to 5 minutes after the reported
+gap. An incident counts as `detected` when the observed gap is at least 75% of the gap TTC
+reported; observed gaps are measured between inferred arrivals, so they rarely match to
+the minute. Incidents during a collection gap are marked `in_coverage = false`.
+
+This answers how many of TTC's own incidents this project's data would have caught. The
+reverse question, long gaps this project saw that TTC did not log, needs care: many short
+holds are never logged. The model is empty until TTC publishes a month this project
+collected (collection began 2026-10-09; October should appear in late November).
+
 ## Tests
 
 Structural tests (unique keys, not null, accepted values, relationships) and model

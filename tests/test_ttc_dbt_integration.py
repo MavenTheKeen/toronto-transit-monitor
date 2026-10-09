@@ -30,6 +30,27 @@ def arrive(conn, train, at, stop="13806"):
         store.normalize_snapshot(conn, snapshot_id)
 
 
+def log_incidents(conn, incidents):
+    """Rows as TTC's official delay log would provide them (see transit.ttc.delays)."""
+    conn.execute(
+        """INSERT INTO raw.ttc_delay_files VALUES (repeat('a', 64), now(), 'test://d',
+               'test://c', ''::bytea, ''::bytea)"""
+    )
+    conn.execute(
+        """INSERT INTO normalized.ttc_delay_codes
+           VALUES ('MUSAN', 'UNSANITARY VEHICLE', repeat('a', 64))"""
+    )
+    for source_id, at, bound, gap in incidents:
+        conn.execute(
+            """INSERT INTO normalized.ttc_official_delays (source_id, delay_at, min_delay,
+                   min_gap, station_text, station_key, station_match, line_text, route_id,
+                   bound, code, file_sha256)
+               VALUES (%s, %s, 5, %s, 'WELLESLEY STATION', 'wellesley', 'exact', 'YU', '1',
+                       %s, 'MUSAN', repeat('a', 64))""",
+            (source_id, at, gap, bound),
+        )
+
+
 def test_ttc_reliability_models(settings):
     executable = os.environ.get("DBT_EXECUTABLE")
     if not executable:
@@ -51,6 +72,17 @@ def test_ttc_reliability_models(settings):
         )
         snapshot_id, _ = store.store_snapshot(conn, "alerts_accessibility", "test://", outage, T0)
         store.normalize_snapshot(conn, snapshot_id)
+        log_incidents(
+            conn,
+            [
+                # During the 11.5-minute southbound gap before train D.
+                (1, SIX_AM + timedelta(seconds=300), "Southbound", 10),
+                # Northbound: nothing was observed in that direction.
+                (2, SIX_AM + timedelta(seconds=300), "Northbound", 8),
+                # The day before collection began: cannot be checked, so not listed.
+                (3, SIX_AM - timedelta(days=1), "Southbound", 10),
+            ],
+        )
 
     assert run_transform(settings.database_url, executable, "dbt")["status"] == "succeeded"
 
@@ -86,6 +118,15 @@ def test_ttc_reliability_models(settings):
             "elevator",
         )
         assert outage_row["active"] is True and outage_row["began_before_collection"] is True
+        detection = {
+            r["source_id"]: r
+            for r in conn.execute("SELECT * FROM analytics.ttc_delay_detection").fetchall()
+        }
+        assert set(detection) == {1, 2}
+        assert detection[1]["detected"] is True and detection[1]["observed_max_gap_seconds"] == 690
+        assert detection[1]["code_description"] == "UNSANITARY VEHICLE"
+        assert detection[2]["detected"] is False and detection[2]["observed_headways"] == 0
+        assert all(r["in_coverage"] for r in detection.values())
 
         # Incremental: a later run keeps earlier rows and adds new ones exactly once.
         arrive(conn, "E", SIX_AM + timedelta(seconds=1200))

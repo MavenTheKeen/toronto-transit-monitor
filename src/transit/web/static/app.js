@@ -1042,6 +1042,20 @@ async function renderPipeline() {
         ? el("p", { class: "muted small" }, `Latest build: ${latest.passed} passed, ${plural(latest.warned, "warning", "warnings")}, ${latest.failed} failed`)
         : null,
     ),
+    data.official_delays
+      ? [
+          el("h2", {}, "TTC's official delay log"),
+          el(
+            "p",
+            {},
+            data.official_delays.log_reaches
+              ? `TTC's published log currently covers incidents up to ${dayFmt.format(new Date(data.official_delays.log_reaches))}. `
+              : "",
+            `Last checked ${ageText(Math.round((Date.now() - new Date(data.official_delays.finished_at)) / 1000))} (${data.official_delays.status}). `,
+            "The city publishes each month a few weeks after it ends; this site's detected gaps are compared with it once the months overlap.",
+          ),
+        ]
+      : null,
     el("h2", {}, "Data collected"),
     el(
       "dl",

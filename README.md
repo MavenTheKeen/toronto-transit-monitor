@@ -104,6 +104,7 @@ docker compose --profile airflow up -d airflow
 docker compose exec airflow airflow dags unpause toronto_bikeshare_reliability
 docker compose exec airflow airflow dags unpause ttc_static_gtfs
 docker compose exec airflow airflow dags unpause open_data_export
+docker compose exec airflow airflow dags unpause ttc_official_delays
 ```
 
 Airflow's UI is at <http://localhost:8080>; it is a local development instance and all

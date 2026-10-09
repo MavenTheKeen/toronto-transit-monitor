@@ -22,6 +22,7 @@ def settings():
         conn.execute("DROP TRIGGER IF EXISTS reject_test_write ON normalized.observations")
         conn.execute("TRUNCATE ops.ingestion_runs CASCADE")
         conn.execute("TRUNCATE raw.payload_bodies, normalized.station_versions CASCADE")
+        conn.execute("TRUNCATE raw.ttc_delay_files, ops.ttc_delay_refreshes CASCADE")
         conn.execute("TRUNCATE ops.source_backoff, ops.transformation_runs")
         conn.execute(
             """TRUNCATE normalized.ttc_gtfs_versions, raw.ttc_realtime_snapshots,

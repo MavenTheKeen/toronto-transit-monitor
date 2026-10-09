@@ -26,6 +26,7 @@ def dag_bag():
         "toronto_bikeshare_reliability",
         "ttc_static_gtfs",
         "open_data_export",
+        "ttc_official_delays",
     }
     return bag
 
@@ -63,6 +64,21 @@ def test_open_data_export_runs_daily_after_the_service_day(dag_bag, monkeypatch)
     )
     export()
     assert calls == [(["/opt/app-venv/bin/transit", "export"], {"check": True, "timeout": 1140})]
+
+
+def test_official_delay_log_check_is_daily(dag_bag, monkeypatch):
+    dag = dag_bag.dags["ttc_official_delays"]
+    assert dag.catchup is False and dag.is_paused_upon_creation is True
+    assert dag.timetable.expression == "0 10 * * *"
+    refresh = dag.get_task("refresh").python_callable
+    calls = []
+    monkeypatch.setattr(
+        refresh.__globals__["subprocess"], "run", lambda args, **kw: calls.append((args, kw))
+    )
+    refresh()
+    assert calls == [
+        (["/opt/app-venv/bin/transit", "ttc-delays-refresh"], {"check": True, "timeout": 840})
+    ]
 
 
 def test_real_dag_import_and_scheduling_safety(monitor_dag):
