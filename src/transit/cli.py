@@ -71,8 +71,7 @@ def main():
             if args.command.startswith("ttc-"):
                 result = run_ttc(args, settings.database_url)
             elif args.command == "init-db":
-                init_db(settings.database_url)
-                result = {"schema": "ready"}
+                result = {"schema": "ready", "migrations_applied": init_db(settings.database_url)}
                 # Deployments give the public site its own read-only login.
                 if os.environ.get("WEB_DB_PASSWORD"):
                     ensure_readonly_role(
