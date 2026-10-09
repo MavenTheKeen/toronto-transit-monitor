@@ -1,0 +1,144 @@
+name: toronto-bikeshare
+
+x-app: &app
+  image: toronto-bikeshare-app:local
+  build:
+    context: .
+  environment: &app-environment
+    DATABASE_URL: postgresql://bikeshare:${POSTGRES_PASSWORD:?Copy .env.example to .env and set POSTGRES_PASSWORD}@postgres:5432/bikeshare
+    GBFS_DISCOVERY_URL: ${GBFS_DISCOVERY_URL:-https://toronto.publicbikesystem.net/customer/gbfs/v3.0/gbfs.json}
+    TZ: UTC
+
+services:
+  postgres:
+    image: postgres:16.15-bookworm@sha256:0ea6700a3b4f0ae6ce746519073558aed4d88a79d8d07622a9a644946c7319c4
+    environment:
+      POSTGRES_USER: bikeshare
+      POSTGRES_DB: bikeshare
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Copy .env.example to .env and set POSTGRES_PASSWORD}
+      TZ: UTC
+      PGTZ: UTC
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bikeshare -d bikeshare"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+    restart: unless-stopped
+
+  init-db:
+    <<: *app
+    command: ["init-db"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  collector:
+    <<: *app
+    profiles: ["tools"]
+    command: ["collect"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      init-db:
+        condition: service_completed_successfully
+    restart: "no"
+
+  dashboard:
+    <<: *app
+    entrypoint: ["streamlit"]
+    command:
+      - run
+      - dashboard/app.py
+      - --server.address=0.0.0.0
+      - --server.port=8501
+      - --server.headless=true
+      - --browser.gatherUsageStats=false
+    ports:
+      - "127.0.0.1:${DASHBOARD_PORT:-8501}:8501"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      init-db:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8501/_stcore/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+
+  dbt:
+    image: toronto-bikeshare-transform:local
+    build:
+      context: .
+      dockerfile: docker/transform.Dockerfile
+    profiles: ["tools"]
+    environment: *app-environment
+    depends_on:
+      postgres:
+        condition: service_healthy
+      init-db:
+        condition: service_completed_successfully
+    restart: "no"
+
+  airflow-db-init:
+    <<: *app
+    profiles: ["airflow"]
+    entrypoint: ["python"]
+    command: ["scripts/init_airflow_db.py"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  airflow:
+    image: toronto-bikeshare-airflow:local
+    build:
+      context: .
+      dockerfile: airflow/Dockerfile
+    profiles: ["airflow"]
+    environment:
+      <<: *app-environment
+      AIRFLOW_CONFIG: /opt/airflow/state/airflow.cfg
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://bikeshare:${POSTGRES_PASSWORD:?Copy .env.example to .env and set POSTGRES_PASSWORD}@postgres:5432/airflow_metadata
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__PARALLELISM: "2"
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__CORE__DEFAULT_TIMEZONE: utc
+      AIRFLOW__CORE__EXECUTION_API_SERVER_URL: http://localhost:8080/execution/
+      AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_ALL_ADMINS: "true"
+      AIRFLOW__API__WORKERS: "1"
+      AIRFLOW__DAG_PROCESSOR__PARSING_PROCESSES: "1"
+    command: ["standalone"]
+    ports:
+      - "127.0.0.1:${AIRFLOW_PORT:-8080}:8080"
+    volumes:
+      - airflow-logs:/opt/airflow/logs
+      - airflow-state:/opt/airflow/state
+    depends_on:
+      postgres:
+        condition: service_healthy
+      init-db:
+        condition: service_completed_successfully
+      airflow-db-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "/opt/airflow/healthcheck.py"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+    restart: unless-stopped
+    stop_grace_period: 30s
+
+volumes:
+  postgres-data:
+  airflow-logs:
+  airflow-state:

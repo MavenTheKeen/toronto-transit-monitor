@@ -1,0 +1,23 @@
+import os
+
+import pytest
+
+from bikeshare.config import Settings
+from bikeshare.db import connect, init_db
+
+
+@pytest.fixture
+def settings():
+    """Only reset project tables in an explicitly disposable database."""
+    url = os.environ.get("TEST_DATABASE_URL")
+    if not url:
+        pytest.skip("Set TEST_DATABASE_URL to run PostgreSQL integration checks")
+    with connect(url) as conn:
+        database = conn.execute("SELECT current_database() AS name").fetchone()["name"]
+        if not database.endswith("_test"):
+            pytest.fail("Integration database name must end in _test; tables are cleared")
+    init_db(url)
+    with connect(url) as conn:
+        conn.execute("TRUNCATE ops.ingestion_runs CASCADE")
+        conn.execute("TRUNCATE ops.source_backoff, ops.transformation_runs")
+    return Settings(url)

@@ -1,0 +1,57 @@
+version: 2
+
+sources:
+  - name: normalized
+    schema: normalized
+    description: Validated records committed atomically by the Python collector.
+    tables:
+      - name: station_snapshots
+        description: One metadata record per collection and station, even if status is missing.
+        columns:
+          - name: collection_id
+            data_tests:
+              - not_null
+          - name: station_id
+            data_tests:
+              - not_null
+          - name: information_raw_id
+            data_tests:
+              - not_null
+              - relationships:
+                  arguments:
+                    to: source('raw', 'feed_payloads')
+                    field: raw_id
+      - name: observations
+        description: Actual station availability reports; no synthetic observations.
+        columns:
+          - name: status_raw_id
+            data_tests:
+              - not_null
+              - relationships:
+                  arguments:
+                    to: source('raw', 'feed_payloads')
+                    field: raw_id
+  - name: ops
+    schema: ops
+    tables:
+      - name: ingestion_runs
+        columns:
+          - name: collection_id
+            data_tests:
+              - unique
+              - not_null
+          - name: status
+            data_tests:
+              - accepted_values:
+                  arguments:
+                    values: ['running', 'succeeded', 'failed']
+  - name: raw
+    schema: raw
+    tables:
+      - name: feed_payloads
+        description: Source JSONB and fetch metadata retained for replay and lineage.
+        columns:
+          - name: raw_id
+            data_tests:
+              - unique
+              - not_null
