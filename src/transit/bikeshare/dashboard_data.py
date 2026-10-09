@@ -8,7 +8,7 @@ import pandas as pd
 import psycopg
 from psycopg.rows import dict_row
 
-from bikeshare.config import FUTURE_TOLERANCE_SECONDS, STALE_SECONDS
+from transit.config import FUTURE_TOLERANCE_SECONDS, STALE_SECONDS
 
 TORONTO = ZoneInfo("America/Toronto")
 TIMESTAMP_COLUMNS = ("status_fetched_at", "source_published_at", "station_reported_at")

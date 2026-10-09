@@ -27,7 +27,7 @@ are not in the subway realtime feed.
    feed, so polling the same publication twice stores it once.
 2. **Validate and normalize**: in a separate transaction, the snapshot is decoded,
    validated against the active static GTFS version, and written to normalized tables.
-   `bikeshare ttc-replay` rebuilds normalized rows from stored raw snapshots without
+   `transit ttc-replay` rebuilds normalized rows from stored raw snapshots without
    any HTTP request.
 3. **Ops**: every poll is a row in `ops.ttc_poll_runs`; every rejected or flagged record
    is a row in `ops.ttc_record_issues`; static refreshes are in `ops.ttc_static_refreshes`.
@@ -130,5 +130,5 @@ docker compose run --rm --no-deps ttc-collector ttc-smoke   # live parse check, 
 
 The `ttc_static_gtfs` Airflow DAG runs `ttc-gtfs-refresh` daily at 09:00 UTC once
 unpaused. Only one collector can run per database (PostgreSQL advisory lock). The
-container health check (`bikeshare ttc-health`) fails unless every feed had a
+container health check (`transit ttc-health`) fails unless every feed had a
 successful poll in the last 2 minutes.

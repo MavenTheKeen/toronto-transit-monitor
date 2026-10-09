@@ -15,5 +15,5 @@ RUN UV_PROJECT_ENVIRONMENT=/opt/app-venv uv sync --locked --no-dev --no-editable
     && useradd --create-home --uid 10001 app
 
 USER app
-ENTRYPOINT ["/opt/app-venv/bin/bikeshare"]
+ENTRYPOINT ["/opt/app-venv/bin/transit"]
 CMD ["transform", "--dbt-executable", "/opt/dbt-venv/bin/dbt", "--project-dir", "/app/dbt"]

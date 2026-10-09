@@ -7,9 +7,10 @@ from pathlib import Path
 import psycopg
 import pytest
 
-from bikeshare.db import LOCK_ID, connect, payload_hash
-from bikeshare.http import FetchError
-from bikeshare.ingestion import CollectionBusy, run
+from transit.bikeshare.ingestion import CollectionBusy, run
+from transit.bikeshare.store import LOCK_ID, payload_hash
+from transit.db import connect
+from transit.http import FetchError
 
 pytestmark = pytest.mark.integration
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -124,7 +125,7 @@ def test_missing_status_is_quality_failure_without_fake_zero(settings):
 
 def test_failed_replay_preserves_previous_normalized_rows(settings, monkeypatch):
     run(settings, "good", client=FixtureClient())
-    import bikeshare.db as db
+    import transit.bikeshare.store as db
 
     original = db.parse_status
 
@@ -139,7 +140,7 @@ def test_failed_replay_preserves_previous_normalized_rows(settings, monkeypatch)
     assert scalar(settings, "SELECT count(*) FROM normalized.observations") == 2
     assert scalar(settings, "SELECT min(num_bikes_available) FROM normalized.observations") >= 0
     assert scalar(settings, "SELECT status FROM ops.ingestion_runs") == "succeeded"
-    from bikeshare.dashboard_data import load_overview
+    from transit.bikeshare.dashboard_data import load_overview
 
     assert load_overview(settings.database_url)["latest"]["collection_id"] == "good"
 

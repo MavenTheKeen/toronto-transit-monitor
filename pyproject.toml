@@ -3,7 +3,7 @@ requires = ["hatchling==1.27.0"]
 build-backend = "hatchling.build"
 
 [project]
-name = "toronto-bikeshare-monitor"
+name = "toronto-transit-monitor"
 version = "0.1.0"
 description = "Traceable Toronto Bike Share GBFS collection and reliability monitoring"
 requires-python = ">=3.12,<3.13"
@@ -20,14 +20,14 @@ dependencies = [
 ]
 
 [project.scripts]
-bikeshare = "bikeshare.cli:main"
+transit = "transit.cli:main"
 
 [dependency-groups]
 dev = ["pytest==9.0.3", "ruff==0.14.2"]
 browser = ["playwright==1.56.0"]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/bikeshare"]
+packages = ["src/transit"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

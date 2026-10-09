@@ -5,10 +5,10 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from bikeshare.db import connect
-from bikeshare.ingestion import run
-from bikeshare.transform import run_transform
 from tests.test_ingestion_integration import FixtureClient
+from transit.bikeshare.ingestion import run
+from transit.db import connect
+from transit.transform import run_transform
 
 pytestmark = pytest.mark.integration
 

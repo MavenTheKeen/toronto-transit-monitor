@@ -88,7 +88,7 @@ services:
       init-db:
         condition: service_completed_successfully
     healthcheck:
-      test: ["CMD", "bikeshare", "ttc-health"]
+      test: ["CMD", "transit", "ttc-health"]
       interval: 60s
       timeout: 15s
       retries: 3
@@ -100,7 +100,7 @@ services:
     <<: *app
     entrypoint: ["uvicorn"]
     command:
-      - bikeshare.web.app:app
+      - transit.web.app:app
       - --host=0.0.0.0
       - --port=8000
       - --no-server-header

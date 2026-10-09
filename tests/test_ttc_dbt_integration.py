@@ -5,10 +5,10 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from bikeshare.db import connect
-from bikeshare.transform import run_transform
-from bikeshare.ttc import static_gtfs, store
 from tests.ttc_helpers import T0, alert_feed, static_zip, trip_feed
+from transit.db import connect
+from transit.transform import run_transform
+from transit.ttc import static_gtfs, store
 
 pytestmark = pytest.mark.integration
 

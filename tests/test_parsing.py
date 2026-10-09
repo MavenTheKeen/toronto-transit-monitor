@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from bikeshare.parsing import (
+from transit.bikeshare.parsing import (
     FeedValidationError,
     discover,
     envelope,

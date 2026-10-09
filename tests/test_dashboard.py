@@ -8,7 +8,7 @@ import pandas as pd
 import pytest
 from streamlit.testing.v1 import AppTest
 
-from bikeshare.dashboard_data import (
+from transit.bikeshare.dashboard_data import (
     AnalyticsNotBuilt,
     annotate_current,
     complete_slot_window,
@@ -156,13 +156,13 @@ def overview_fixture(now=None):
 def run_app(monkeypatch, overview, history=None, analytics=None):
     monkeypatch.setenv("DATABASE_URL", "postgresql://test-only/not-connected")
     with (
-        patch("bikeshare.dashboard_data.load_overview", return_value=overview),
+        patch("transit.bikeshare.dashboard_data.load_overview", return_value=overview),
         patch(
-            "bikeshare.dashboard_data.load_history",
+            "transit.bikeshare.dashboard_data.load_history",
             return_value=(pd.DataFrame() if history is None else history),
         ),
         patch(
-            "bikeshare.dashboard_data.load_analytics",
+            "transit.bikeshare.dashboard_data.load_analytics",
             **(
                 {"side_effect": AnalyticsNotBuilt()}
                 if analytics is None
@@ -186,7 +186,7 @@ def test_dashboard_empty_state(monkeypatch):
 def test_dashboard_database_error_does_not_leak_credentials(monkeypatch):
     monkeypatch.setenv("DATABASE_URL", "postgresql://private:secret@invalid/database")
     with patch(
-        "bikeshare.dashboard_data.load_overview", side_effect=RuntimeError("private:secret")
+        "transit.bikeshare.dashboard_data.load_overview", side_effect=RuntimeError("private:secret")
     ):
         app = AppTest.from_file(str(APP)).run()
     assert not app.exception
@@ -220,9 +220,9 @@ def test_dashboard_no_matching_stations(monkeypatch):
     overview = overview_fixture()
     monkeypatch.setenv("DATABASE_URL", "postgresql://test-only/not-connected")
     with (
-        patch("bikeshare.dashboard_data.load_overview", return_value=overview),
-        patch("bikeshare.dashboard_data.load_history", return_value=pd.DataFrame()),
-        patch("bikeshare.dashboard_data.load_analytics", side_effect=AnalyticsNotBuilt()),
+        patch("transit.bikeshare.dashboard_data.load_overview", return_value=overview),
+        patch("transit.bikeshare.dashboard_data.load_history", return_value=pd.DataFrame()),
+        patch("transit.bikeshare.dashboard_data.load_analytics", side_effect=AnalyticsNotBuilt()),
     ):
         app = AppTest.from_file(str(APP)).run()
         app.text_input[0].input("no-such-station").run()
@@ -313,10 +313,11 @@ def test_dashboard_analytics_missing_is_a_specific_build_state(monkeypatch):
 def test_dashboard_analytics_query_failure_is_not_empty_state(monkeypatch):
     monkeypatch.setenv("DATABASE_URL", "postgresql://test-only/not-connected")
     with (
-        patch("bikeshare.dashboard_data.load_overview", return_value=overview_fixture()),
-        patch("bikeshare.dashboard_data.load_history", return_value=pd.DataFrame()),
+        patch("transit.bikeshare.dashboard_data.load_overview", return_value=overview_fixture()),
+        patch("transit.bikeshare.dashboard_data.load_history", return_value=pd.DataFrame()),
         patch(
-            "bikeshare.dashboard_data.load_analytics", side_effect=RuntimeError("private:secret")
+            "transit.bikeshare.dashboard_data.load_analytics",
+            side_effect=RuntimeError("private:secret"),
         ),
     ):
         app = AppTest.from_file(str(APP), default_timeout=30).run()

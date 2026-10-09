@@ -7,9 +7,9 @@ from datetime import UTC, datetime, timedelta
 
 from psycopg.types.json import Jsonb
 
-from bikeshare import locks
-from bikeshare.parsing import FeedValidationError
-from bikeshare.ttc import realtime
+from transit import locks
+from transit.bikeshare.parsing import FeedValidationError
+from transit.ttc import realtime
 
 EVENT_LOCK_ID = locks.TTC_EVENT_MATCHING
 # A train revisits a platform at most once per round trip (20+ minutes), so a prediction

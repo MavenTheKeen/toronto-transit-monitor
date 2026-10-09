@@ -7,9 +7,9 @@ from datetime import date
 
 import pytest
 
-from bikeshare.parsing import FeedValidationError
-from bikeshare.ttc.static_gtfs import parse, seconds, station_key, station_parts
 from tests.ttc_helpers import LINE_1_NORTH, LINE_1_SOUTH, LINE_2_EAST, static_zip
+from transit.bikeshare.parsing import FeedValidationError
+from transit.ttc.static_gtfs import parse, seconds, station_key, station_parts
 
 
 @pytest.mark.parametrize(

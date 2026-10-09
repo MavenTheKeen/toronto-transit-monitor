@@ -3,9 +3,10 @@
 from datetime import UTC, datetime
 from uuid import uuid4
 
-from bikeshare.db import LOCK_ID, connect, load_raw, normalize, store_raw
-from bikeshare.http import FeedClient, FetchError
-from bikeshare.parsing import FeedValidationError, discover
+from transit.bikeshare.parsing import FeedValidationError, discover
+from transit.bikeshare.store import LOCK_ID, load_raw, normalize, store_raw
+from transit.db import connect
+from transit.http import FeedClient, FetchError
 
 
 class CollectionBusy(RuntimeError):

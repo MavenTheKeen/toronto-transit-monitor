@@ -15,7 +15,7 @@ from zoneinfo import ZoneInfo
 from google.protobuf.message import DecodeError
 from google.transit import gtfs_realtime_pb2
 
-from bikeshare.parsing import FeedValidationError
+from transit.bikeshare.parsing import FeedValidationError
 
 TORONTO = ZoneInfo("America/Toronto")
 # Subway service runs past midnight; arrivals before 04:00 belong to the previous day.

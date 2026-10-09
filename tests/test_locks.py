@@ -3,7 +3,7 @@
 import re
 from pathlib import Path
 
-from bikeshare import locks
+from transit import locks
 
 
 def test_lock_ids_are_unique():
@@ -11,7 +11,7 @@ def test_lock_ids_are_unique():
 
 
 def test_no_lock_id_literals_outside_the_locks_module():
-    src = Path(__file__).resolve().parents[1] / "src" / "bikeshare"
+    src = Path(__file__).resolve().parents[1] / "src" / "transit"
     offenders = [
         p.name
         for p in src.rglob("*.py")

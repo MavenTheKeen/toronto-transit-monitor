@@ -5,8 +5,8 @@ import math
 import re
 from datetime import datetime, timedelta
 
-from bikeshare.config import FUTURE_TOLERANCE_SECONDS, STALE_SECONDS
-from bikeshare.ttc.realtime import TORONTO, service_date
+from transit.config import FUTURE_TOLERANCE_SECONDS, STALE_SECONDS
+from transit.ttc.realtime import TORONTO, service_date
 
 PREDICTIONS_STALE = timedelta(minutes=2)
 ALERTS_STALE = timedelta(minutes=3)

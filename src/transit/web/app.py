@@ -1,4 +1,4 @@
-"""Public read-only API and page. Run: uvicorn bikeshare.web.app:app
+"""Public read-only API and page. Run: uvicorn transit.web.app:app
 
 Responses are cached in memory for 15 s, so load on PostgreSQL does not grow with
 visitors. A small per-IP limit protects the process. Browsers only talk to this
@@ -18,12 +18,12 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from bikeshare.db import connect
-from bikeshare.web import queries
+from transit.db import connect
+from transit.web import queries
 
 CACHE_SECONDS = 15
 RATE_LIMIT = int(os.environ.get("WEB_RATE_LIMIT_PER_MINUTE", "120"))
-STATIC = files("bikeshare.web").joinpath("static")
+STATIC = files("transit.web").joinpath("static")
 ATTRIBUTION = "Data: Toronto Transit Commission. Predictions may be inaccurate."
 
 

@@ -2,10 +2,10 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from bikeshare.dashboard_data import annotate_current, load_history, load_overview
-from bikeshare.db import connect
-from bikeshare.ingestion import run
 from tests.test_ingestion_integration import FixtureClient
+from transit.bikeshare.dashboard_data import annotate_current, load_history, load_overview
+from transit.bikeshare.ingestion import run
+from transit.db import connect
 
 
 @pytest.mark.integration

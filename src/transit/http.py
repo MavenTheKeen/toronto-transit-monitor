@@ -41,7 +41,7 @@ class FeedClient:
         self.client = client or httpx.Client(
             timeout=httpx.Timeout(20.0, connect=5.0),
             follow_redirects=False,
-            headers={"User-Agent": "TorontoBikeShareReliabilityMonitor/0.1 (portfolio project)"},
+            headers={"User-Agent": "TorontoTransitMonitor/0.1 (portfolio project)"},
         )
         self.sleep = sleep
         self.attempts = attempts

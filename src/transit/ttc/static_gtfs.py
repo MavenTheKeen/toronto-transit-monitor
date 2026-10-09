@@ -13,8 +13,8 @@ from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from datetime import date, datetime
 
-from bikeshare.parsing import FeedValidationError
-from bikeshare.ttc.sources import SUBWAY_ROUTE_TYPE
+from transit.bikeshare.parsing import FeedValidationError
+from transit.ttc.sources import SUBWAY_ROUTE_TYPE
 
 # Interchange platforms that GTFS names differently on each line.
 STATION_ALIASES = {"Bloor": "Bloor-Yonge", "Yonge": "Bloor-Yonge"}

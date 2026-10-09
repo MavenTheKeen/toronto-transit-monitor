@@ -18,5 +18,5 @@ RUN uv sync --locked --no-dev --no-editable --no-cache \
     && useradd --create-home --uid 10001 app
 
 USER app
-ENTRYPOINT ["bikeshare"]
+ENTRYPOINT ["transit"]
 CMD ["--help"]

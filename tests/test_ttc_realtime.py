@@ -6,10 +6,10 @@ from pathlib import Path
 import pytest
 from google.transit import gtfs_realtime_pb2
 
-from bikeshare.parsing import FeedValidationError
-from bikeshare.ttc import realtime
-from bikeshare.ttc.static_gtfs import parse
 from tests.ttc_helpers import T0, static_zip, trip_feed
+from transit.bikeshare.parsing import FeedValidationError
+from transit.ttc import realtime
+from transit.ttc.static_gtfs import parse
 
 FIXTURES = Path(__file__).parent / "fixtures" / "ttc"
 

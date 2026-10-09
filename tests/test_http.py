@@ -6,7 +6,7 @@ from email.utils import format_datetime
 import httpx
 import pytest
 
-from bikeshare.http import FeedClient, FetchError, retry_delay
+from transit.http import FeedClient, FetchError, retry_delay
 
 URL = "https://toronto.publicbikesystem.net/customer/gbfs/v3.0/gbfs.json"
 PAYLOAD = {"version": "3.0", "data": {"stations": []}}
@@ -100,7 +100,7 @@ def test_retry_after_http_date_is_respected(client_factory, monkeypatch):
         def now(cls, tz=None):
             return now.astimezone(tz)
 
-    monkeypatch.setattr("bikeshare.http.datetime", FrozenDatetime)
+    monkeypatch.setattr("transit.http.datetime", FrozenDatetime)
     client, requests, sleeps = client_factory(
         [
             httpx.Response(
@@ -178,7 +178,7 @@ def test_default_client_has_explicit_timeouts_and_identification():
     try:
         assert client.client.timeout.connect == 5.0
         assert client.client.timeout.read == 20.0
-        assert "TorontoBikeShare" in client.client.headers["User-Agent"]
+        assert "TorontoTransitMonitor" in client.client.headers["User-Agent"]
     finally:
         client.close()
 

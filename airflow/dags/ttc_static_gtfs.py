@@ -5,7 +5,7 @@ from datetime import UTC, datetime, timedelta
 
 from airflow.sdk import DAG, task
 
-APP = "/opt/app-venv/bin/bikeshare"
+APP = "/opt/app-venv/bin/transit"
 
 with DAG(
     dag_id="ttc_static_gtfs",

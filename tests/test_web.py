@@ -5,13 +5,13 @@ from datetime import timedelta
 import pytest
 from fastapi.testclient import TestClient
 
-from bikeshare.db import connect
-from bikeshare.ingestion import run
-from bikeshare.ttc import static_gtfs, store
-from bikeshare.web import queries
-from bikeshare.web.app import RateLimiter, TTLCache, create_app
 from tests.test_ingestion_integration import FixtureClient
 from tests.ttc_helpers import T0, alert_feed, static_zip, trip_feed
+from transit.bikeshare.ingestion import run
+from transit.db import connect
+from transit.ttc import static_gtfs, store
+from transit.web import queries
+from transit.web.app import RateLimiter, TTLCache, create_app
 
 
 class Clock:

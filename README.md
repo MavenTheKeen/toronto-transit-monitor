@@ -182,7 +182,7 @@ unit/UI tests explicitly: `uv run --locked pytest -m 'not integration' -q`.
 The PostgreSQL suite verifies duplicate prevention, identical later observations,
 concurrency exclusion, rollback/replay, cross-run Retry-After, missing observations,
 DST period boundaries, and dbt empty/full denominators including zero eligibility.
-`bikeshare transform` records dbt results in `ops.transformation_runs`.
+`transit transform` records dbt results in `ops.transformation_runs`.
 
 An explicit live API parse check (no database writes):
 
@@ -194,9 +194,9 @@ Native application commands use `DATABASE_URL` (the app does not auto-load `.env
 
 ```powershell
 $env:DATABASE_URL='postgresql://bikeshare:YOUR_ENV_PASSWORD@127.0.0.1:5432/bikeshare'
-uv run --locked bikeshare init-db
-uv run --locked bikeshare collect
-uv run --locked bikeshare transform --dbt-executable "$PWD/dbt/.venv/Scripts/dbt.exe"
+uv run --locked transit init-db
+uv run --locked transit collect
+uv run --locked transit transform --dbt-executable "$PWD/dbt/.venv/Scripts/dbt.exe"
 uv run --locked streamlit run dashboard/app.py --server.address=127.0.0.1 --browser.gatherUsageStats=false
 ```
 

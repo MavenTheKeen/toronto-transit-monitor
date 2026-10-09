@@ -1,4 +1,4 @@
-from bikeshare.transform import dbt_environment
+from transit.transform import dbt_environment
 
 
 def test_dbt_configuration_stays_in_environment_and_decodes_url_password():

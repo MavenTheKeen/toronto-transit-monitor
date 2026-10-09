@@ -6,7 +6,7 @@ from datetime import UTC, datetime, timedelta
 
 from airflow.sdk import DAG, get_current_context, task
 
-APP = "/opt/app-venv/bin/bikeshare"
+APP = "/opt/app-venv/bin/transit"
 DBT = "/opt/dbt-venv/bin/dbt"
 DAG_ID = "toronto_bikeshare_reliability"
 

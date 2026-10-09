@@ -1,20 +1,20 @@
-"""Run ingestion without an orchestrator: python -m bikeshare.cli --help."""
+"""Run ingestion without an orchestrator: python -m transit.cli --help."""
 
 import argparse
 import json
 import os
 import sys
 
-from bikeshare.config import DISCOVERY_URL, Settings
-from bikeshare.db import connect, init_db
-from bikeshare.http import FeedClient, FetchError
-from bikeshare.ingestion import CollectionBusy, run
-from bikeshare.parsing import FeedValidationError, discover, parse_information, parse_status
-from bikeshare.transform import run_transform
-from bikeshare.ttc import collector as ttc_collector
-from bikeshare.ttc import realtime as ttc_realtime
-from bikeshare.ttc import store as ttc_store
-from bikeshare.ttc.sources import REALTIME_FEEDS, REALTIME_HOST
+from transit.bikeshare.ingestion import CollectionBusy, run
+from transit.bikeshare.parsing import FeedValidationError, discover, parse_information, parse_status
+from transit.config import DISCOVERY_URL, Settings
+from transit.db import connect, init_db
+from transit.http import FeedClient, FetchError
+from transit.transform import run_transform
+from transit.ttc import collector as ttc_collector
+from transit.ttc import realtime as ttc_realtime
+from transit.ttc import store as ttc_store
+from transit.ttc.sources import REALTIME_FEEDS, REALTIME_HOST
 
 
 def main():

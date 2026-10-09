@@ -10,8 +10,8 @@ from uuid import uuid4
 from psycopg.conninfo import conninfo_to_dict
 from psycopg.types.json import Jsonb
 
-from bikeshare import locks
-from bikeshare.db import connect
+from transit import locks
+from transit.db import connect
 
 TRANSFORM_LOCK = locks.DBT_TRANSFORM
 
@@ -57,7 +57,7 @@ def run_transform(database_url: str, executable="dbt", project_dir="dbt") -> dic
             )
             try:
                 # Isolated artifacts prevent accidentally importing a previous build's results.
-                with tempfile.TemporaryDirectory(prefix="bikeshare-dbt-") as artifacts:
+                with tempfile.TemporaryDirectory(prefix="transit-dbt-") as artifacts:
                     result = subprocess.run(
                         [
                             str(executable),

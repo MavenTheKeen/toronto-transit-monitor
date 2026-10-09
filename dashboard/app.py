@@ -5,8 +5,7 @@ from datetime import UTC, datetime
 import pandas as pd
 import streamlit as st
 
-from bikeshare.config import STALE_SECONDS, Settings
-from bikeshare.dashboard_data import (
+from transit.bikeshare.dashboard_data import (
     AnalyticsNotBuilt,
     annotate_current,
     load_analytics,
@@ -16,6 +15,7 @@ from bikeshare.dashboard_data import (
     prepare_history,
     ranked_stations,
 )
+from transit.config import STALE_SECONDS, Settings
 
 st.set_page_config(page_title="Toronto Bike Share Reliability", page_icon="🚲", layout="wide")
 st.title("Toronto Bike Share Reliability Monitor")

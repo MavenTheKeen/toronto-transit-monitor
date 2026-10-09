@@ -4,11 +4,11 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from bikeshare.db import connect
-from bikeshare.http import FetchError
-from bikeshare.ttc import collector, static_gtfs, store
-from bikeshare.ttc.sources import REALTIME_FEEDS
 from tests.ttc_helpers import T0, alert_feed, static_zip, trip_feed
+from transit.db import connect
+from transit.http import FetchError
+from transit.ttc import collector, static_gtfs, store
+from transit.ttc.sources import REALTIME_FEEDS
 
 pytestmark = pytest.mark.integration
 

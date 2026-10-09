@@ -1,35 +1,21 @@
-"""PostgreSQL persistence; source writes and normalized writes have separate commits."""
+"""Bike Share persistence; source writes and normalized writes have separate commits."""
 
 import hashlib
 import json
 from datetime import UTC, datetime
-from importlib.resources import files
 
-import psycopg
-from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
-from bikeshare import locks
-from bikeshare.config import FUTURE_TOLERANCE_SECONDS, STALE_SECONDS
-from bikeshare.parsing import FeedValidationError, parse_information, parse_status, timestamp
+from transit import locks
+from transit.bikeshare.parsing import (
+    FeedValidationError,
+    parse_information,
+    parse_status,
+    timestamp,
+)
+from transit.config import FUTURE_TOLERANCE_SECONDS, STALE_SECONDS
 
 LOCK_ID = locks.BIKESHARE_COLLECTION  # Session lock spans HTTP and SQL.
-
-
-def connect(database_url):
-    return psycopg.connect(
-        database_url,
-        autocommit=True,
-        row_factory=dict_row,
-        connect_timeout=10,
-        options="-c timezone=UTC -c statement_timeout=60000",
-    )
-
-
-def init_db(database_url):
-    with connect(database_url) as conn, conn.transaction():
-        for name in ("schema.sql", "ttc_schema.sql"):
-            conn.execute(files("bikeshare").joinpath(name).read_text(encoding="utf-8"))
 
 
 def payload_hash(payload):

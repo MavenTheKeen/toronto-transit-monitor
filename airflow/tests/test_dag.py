@@ -44,7 +44,7 @@ def test_ttc_static_refresh_is_daily_and_shell_free(dag_bag, monkeypatch):
     )
     refresh()
     assert calls == [
-        (["/opt/app-venv/bin/bikeshare", "ttc-gtfs-refresh"], {"check": True, "timeout": 840})
+        (["/opt/app-venv/bin/transit", "ttc-gtfs-refresh"], {"check": True, "timeout": 840})
     ]
 
 
@@ -85,10 +85,10 @@ def test_task_retries_reuse_identity_and_shell_free_commands(monitor_dag, monkey
     replay = monitor_dag.get_task("replay").python_callable
     assert replay(first) == first
     monitor_dag.get_task("transform").python_callable(first)
-    assert requests[0][0] == ["/opt/app-venv/bin/bikeshare", "collect", "--collection-id", first]
-    assert requests[-2][0] == ["/opt/app-venv/bin/bikeshare", "replay", "--collection-id", first]
+    assert requests[0][0] == ["/opt/app-venv/bin/transit", "collect", "--collection-id", first]
+    assert requests[-2][0] == ["/opt/app-venv/bin/transit", "replay", "--collection-id", first]
     assert requests[-1][0] == [
-        "/opt/app-venv/bin/bikeshare",
+        "/opt/app-venv/bin/transit",
         "transform",
         "--dbt-executable",
         "/opt/dbt-venv/bin/dbt",

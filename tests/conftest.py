@@ -2,8 +2,8 @@ import os
 
 import pytest
 
-from bikeshare.config import Settings
-from bikeshare.db import connect, init_db
+from transit.config import Settings
+from transit.db import connect, init_db
 
 
 @pytest.fixture
