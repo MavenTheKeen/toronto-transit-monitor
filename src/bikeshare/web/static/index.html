@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Toronto subway service status, live train positions and next arrivals from TTC open data.">
+  <title>Toronto Subway Now</title>
+  <link rel="stylesheet" href="/static/app.css">
+  <script src="/static/app.js" defer></script>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site">
+    <a class="brand" href="#/">Toronto Subway Now</a>
+    <nav aria-label="Lines" id="line-nav"></nav>
+  </header>
+  <main id="main" tabindex="-1">
+    <p class="loading">Loading…</p>
+  </main>
+  <p class="updated" id="updated" aria-live="polite"></p>
+  <footer class="site">
+    <p>Data: Toronto Transit Commission (GTFS and GTFS-Realtime open data) and Bike Share
+      Toronto. Predictions may be inaccurate. Train positions are estimated from predicted
+      arrival times. Not affiliated with the TTC.</p>
+    <p>No cookies, no tracking. Refreshes every 20 seconds while this tab is open.</p>
+  </footer>
+  <noscript><p class="notice">This page needs JavaScript to load live data.</p></noscript>
+</body>
+</html>
