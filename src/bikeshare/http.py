@@ -9,6 +9,8 @@ from urllib.parse import urlsplit
 
 import httpx
 
+BIKESHARE_HOST = "toronto.publicbikesystem.net"
+
 
 class FetchError(RuntimeError):
     def __init__(self, message, *, retry_not_before=None):
@@ -48,11 +50,24 @@ class FeedClient:
         self.client.close()
 
     def fetch(self, url: str) -> dict:
+        body = self.fetch_bytes(url)
+        try:
+            payload = json.loads(body)
+        except (ValueError, RecursionError) as exc:
+            raise FetchError("Source returned invalid JSON") from exc
+        if not isinstance(payload, dict):
+            raise FetchError("Source JSON root must be an object")
+        return payload
+
+    def fetch_bytes(
+        self, url: str, *, host: str = BIKESHARE_HOST, max_bytes: int = 10 * 1024 * 1024
+    ) -> bytes:
+        """GET one official source URL; only `host` over HTTPS is ever contacted."""
         try:
             parsed = urlsplit(url)
             allowed = (
                 parsed.scheme == "https"
-                and parsed.hostname == "toronto.publicbikesystem.net"
+                and parsed.hostname == host
                 and parsed.port in (None, 443)
                 and parsed.username is None
                 and parsed.password is None
@@ -71,8 +86,10 @@ class FeedClient:
                     if response.is_success:
                         for chunk in response.iter_bytes(chunk_size=65536):
                             body.extend(chunk)
-                            if len(body) > 10 * 1024 * 1024:
-                                raise FetchError("Source response exceeds 10 MiB limit")
+                            if len(body) > max_bytes:
+                                raise FetchError(
+                                    f"Source response exceeds {max_bytes >> 20} MiB limit"
+                                )
             except (httpx.TimeoutException, httpx.TransportError) as exc:
                 if attempt + 1 == self.attempts:
                     raise FetchError(
@@ -82,13 +99,7 @@ class FeedClient:
                 if response.status_code not in (408, 429, 500, 502, 503, 504):
                     if not response.is_success:
                         raise FetchError(f"HTTP {response.status_code}: non-retryable response")
-                    try:
-                        payload = json.loads(body)
-                    except (ValueError, RecursionError) as exc:
-                        raise FetchError("Source returned invalid JSON") from exc
-                    if not isinstance(payload, dict):
-                        raise FetchError("Source JSON root must be an object")
-                    return payload
+                    return bytes(body)
                 delay = retry_delay(response.headers.get("Retry-After"), attempt)
                 try:
                     retry_at = datetime.now(UTC) + timedelta(seconds=delay)
