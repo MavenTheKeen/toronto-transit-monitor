@@ -132,6 +132,35 @@ def test_early_drop_is_not_an_arrival_but_a_departed_train_is(conn):
     assert passed[("131", "13806")] == t2  # Train gone from the feed, but it was due.
 
 
+def test_sudden_empty_snapshot_is_skipped_until_the_feed_stays_empty(conn):
+    def snap(at, count):
+        trains = [
+            {"trip_id": str(i), "route_id": "1", "stops": [("13806", 3, 30)]} for i in range(count)
+        ]
+        return trip_feed(at, trains)
+
+    def passed():
+        return one(
+            conn,
+            "SELECT count(*) FROM normalized.ttc_train_stop_events WHERE passed_at IS NOT NULL",
+        )
+
+    t1, t2, t3 = (T0 + timedelta(seconds=s) for s in (0, 30, 60))
+    ingest(conn, "trips_subway", snap(t1, 12), t1)
+    result, _ = ingest(conn, "trips_subway", snap(t2, 0), t2)  # TTC blip: no trains listed.
+    assert result["accepted"] == 0 and result["rejected"] == 1
+    assert one(conn, "SELECT count(*) FROM normalized.ttc_current_predictions") == 12
+    assert passed() == 0  # Trains due now were not marked as arrived.
+    assert one(conn, "SELECT issue FROM ops.ttc_record_issues") == "feed_dropout"
+    ingest(conn, "trips_subway", snap(t3, 5), t3)  # Partial snapshot: also skipped.
+    assert one(conn, "SELECT count(*) FROM normalized.ttc_current_predictions") == 12
+
+    # Still empty after the window: the trains really are gone.
+    gone = t1 + store.DROPOUT_WINDOW + timedelta(seconds=30)
+    ingest(conn, "trips_subway", snap(gone, 0), gone)
+    assert one(conn, "SELECT count(*) FROM normalized.ttc_current_predictions") == 0
+
+
 def test_churning_trip_ids_for_one_train_are_one_visit(conn):
     # Observed live: the same train (vehicle 118) gets a new trip_id on most polls.
     for n, offset in enumerate((0, 30, 60)):

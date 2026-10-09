@@ -20,6 +20,14 @@ LOOKBACK = timedelta(hours=3)
 # last listed, and only for visits listed recently (older ones span a collection gap).
 PASSED_DUE = timedelta(minutes=2)
 PASSED_RECENT = timedelta(minutes=10)
+# TTC sometimes publishes a trip-updates snapshot listing no trains (or about half of
+# them) between two complete ones. Taken at face value it would blank the live site and
+# mark every train due within PASSED_DUE as arrived. A snapshot listing fewer than
+# DROPOUT_SHARE of the trains seen in the last DROPOUT_WINDOW is skipped; if the feed
+# really stays empty, nothing was seen within the window and it is accepted after that.
+DROPOUT_SHARE = 0.5
+DROPOUT_WINDOW = timedelta(minutes=2)
+DROPOUT_MIN_TRAINS = 10
 
 
 def active_feed_version(conn) -> str | None:
@@ -133,12 +141,28 @@ def _claim_newest(conn, raw) -> bool:
     )
 
 
+def _dropout(conn, seen_at, listed: int) -> realtime.Issue | None:
+    recent = conn.execute(
+        """SELECT count(DISTINCT train_id) AS trains FROM normalized.ttc_train_stop_events
+           WHERE last_seen_at < %s AND last_seen_at >= %s""",
+        (seen_at, seen_at - DROPOUT_WINDOW),
+    ).fetchone()["trains"]
+    if recent < DROPOUT_MIN_TRAINS or listed >= recent * DROPOUT_SHARE:
+        return None
+    return realtime.Issue(
+        "feed_dropout", "rejected", detail={"trains_listed": listed, "trains_recent": recent}
+    )
+
+
 def _normalize_trips(conn, raw, snapshot, stops):
     predictions, issues = realtime.parse_trip_updates(snapshot, stops)
     seen_at, snapshot_id = raw["feed_timestamp"], raw["snapshot_id"]
     trains = sorted({p["train_id"] for p in predictions})
     # Serialize visit matching so a concurrent replay cannot create duplicate visits.
     conn.execute("SELECT pg_advisory_xact_lock(%s)", (EVENT_LOCK_ID,))
+    dropout = _dropout(conn, seen_at, len(trains))
+    if dropout:
+        return 0, [*issues, dropout]
     visits = defaultdict(list)
     for row in conn.execute(
         """SELECT event_id, train_id, stop_id, predicted_arrival, first_seen_at,

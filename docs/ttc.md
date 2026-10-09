@@ -58,6 +58,13 @@ platforms of each train. Two findings from the live feed shape the model:
   label changes. A platform dropped well before its predicted time is a withdrawn
   prediction (short turn, reroute), not an arrival. If the platform is listed again
   later, the mark is withdrawn.
+- **The feed sometimes drops out.** About 1 in 10 trip snapshots on the first day of
+  collection listed no trains at all (once, about half), between two complete ones.
+  Accepting them would blank the live site and mark every train due within 2 minutes as
+  arrived. Such a snapshot is skipped: its raw payload is kept and a `feed_dropout` issue
+  is logged, but visits and current predictions are left alone. If the feed stays empty,
+  no train was seen in the last 2 minutes, so the empty snapshot is accepted; the end of
+  service and a real shutdown still show up within about 2 minutes.
 
 Terminal platforms need care in analysis: trains dwell and change ends there, and the
 vehicle label can change when they do. Near Wilson Yard, where trains enter and leave
@@ -71,6 +78,7 @@ excluded from reliability metrics.
 | --- | --- |
 | Header missing version or timestamp, non-`FULL_DATASET`, undecodable protobuf | Snapshot fails; poll recorded as failed |
 | Feed timestamp more than 5 minutes from fetch time | Flagged |
+| Trip snapshot lists fewer than half the trains seen in the previous 2 minutes | Snapshot skipped (`feed_dropout`); raw kept |
 | Missing or duplicate `trip_id`; duplicate vehicle in one snapshot | Rejected |
 | Missing vehicle label | Flagged; the trip ID is used as the train ID |
 | Platform not in static GTFS, or belonging to another line | Rejected |
