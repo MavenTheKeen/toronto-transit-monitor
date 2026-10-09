@@ -1,6 +1,6 @@
 # Public site and API
 
-`web` serves a read-only JSON API and a single mobile-first page. It reads only from
+`web` serves **Toronto Transit Now**: a read-only JSON API and a single mobile-first page. It reads only from
 PostgreSQL; browsers never call the TTC or Bike Share APIs.
 
 ```powershell
@@ -15,8 +15,8 @@ opens it on a station), `#/reliability` (reliability).
 | --- | --- | --- | --- | --- |
 | ![Service status](screenshots/site-home.png) | ![Line 1 diagram](screenshots/site-line1.png) | ![Bloor-Yonge](screenshots/site-station.png) | ![Subway and Bike Share map](screenshots/site-map.png) | ![Reliability](screenshots/site-reliability.png) |
 
-Screenshots were captured from real data on 2026-10-09 at about 11:10 Toronto time,
-about 1 h 45 min after collection started.
+Screenshots were captured from real data on 2026-10-09 at about noon Toronto time,
+about 2 h 30 min after collection started.
 
 ## Endpoints
 

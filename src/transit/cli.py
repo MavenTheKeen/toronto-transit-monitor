@@ -1,4 +1,4 @@
-"""Run ingestion without an orchestrator: python -m transit.cli --help."""
+"""Toronto Transit Monitor: collect, replay and transform without an orchestrator."""
 
 import argparse
 import json

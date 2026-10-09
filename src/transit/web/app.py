@@ -70,7 +70,7 @@ class RateLimiter:
 
 
 def create_app(database_url: str | None = None, clock=lambda: datetime.now(UTC)) -> FastAPI:
-    app = FastAPI(title="Toronto subway status", docs_url=None, redoc_url=None, openapi_url=None)
+    app = FastAPI(title="Toronto Transit Now", docs_url=None, redoc_url=None, openapi_url=None)
     cache = TTLCache(CACHE_SECONDS)
     limiter = RateLimiter(RATE_LIMIT)
     static_cache = {}
