@@ -90,6 +90,11 @@ service. Each alert version gets:
 Accessibility alerts list platforms only; their lines are derived from static GTFS.
 Alerts whose active period starts in the future are planned disruptions.
 
+`advance_notice` marks notices of planned work worded in the future tense ("There will
+be no subway service ... nightly ..."). TTC gives these an active period covering the
+whole notice week, not the closure hours, so they must not be read as a current
+disruption. Derived fields are recomputed on replay, so rule changes apply to history.
+
 ## Retention
 
 Hourly, the collector deletes raw snapshots older than `TTC_RAW_RETENTION_DAYS`

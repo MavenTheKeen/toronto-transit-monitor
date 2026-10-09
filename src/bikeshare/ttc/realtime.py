@@ -212,6 +212,11 @@ TEXT_PATTERNS = [
 ]
 
 
+# Advance notices of planned work are published days ahead with an active period covering
+# the whole notice window, e.g. "There will be no subway service ... nightly ...".
+ADVANCE_NOTICE = re.compile(r"\bthere will be\b|\bwill be closed\b|\bwill not (?:run|stop)\b", re.I)
+
+
 def classify_alert(effect: str, text: str) -> dict:
     """TTC alerts have no severity, and effect can contradict the text, so use both."""
     effect_status = EFFECT_STATUS.get(effect)
@@ -229,6 +234,7 @@ def classify_alert(effect: str, text: str) -> dict:
         "text_status": text_status,
         "derived_status": derived,
         "status_mismatch": mismatch,
+        "advance_notice": bool(ADVANCE_NOTICE.search(text)),
     }
 
 

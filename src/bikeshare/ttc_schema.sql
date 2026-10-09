@@ -178,9 +178,13 @@ CREATE TABLE IF NOT EXISTS normalized.ttc_alert_versions (
     text_status text,
     derived_status text NOT NULL,
     status_mismatch boolean NOT NULL,
+    advance_notice boolean NOT NULL DEFAULT false,
     PRIMARY KEY (feed, alert_id, version_hash),
     FOREIGN KEY (feed, alert_id) REFERENCES normalized.ttc_alerts
 );
+-- Added after the first deployment; harmless when the column already exists.
+ALTER TABLE normalized.ttc_alert_versions
+  ADD COLUMN IF NOT EXISTS advance_notice boolean NOT NULL DEFAULT false;
 CREATE INDEX IF NOT EXISTS ttc_alert_versions_stops
   ON normalized.ttc_alert_versions USING gin (stop_ids);
 CREATE INDEX IF NOT EXISTS ttc_alert_versions_routes

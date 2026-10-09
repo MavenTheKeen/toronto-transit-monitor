@@ -180,3 +180,8 @@ def test_real_captured_alerts_flag_the_effect_text_contradiction():
     # Planned closure: the active period starts after the snapshot.
     start = by_id["77528"]["active_periods"][0]["start"]
     assert datetime.fromtimestamp(start, UTC) > snapshot.feed_timestamp
+    # 77523 is the advance notice for that closure; its active period is the week the
+    # notice is shown, so it must not count as a current disruption.
+    assert by_id["77523"]["advance_notice"] is True
+    assert by_id["77528"]["advance_notice"] is False
+    assert by_id["77794"]["advance_notice"] is False

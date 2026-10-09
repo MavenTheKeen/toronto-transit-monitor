@@ -265,9 +265,16 @@ def _normalize_alerts(conn, raw, snapshot, stops):
                (feed, alert_id, version_hash, first_seen_at, last_seen_at, first_snapshot_id,
                 cause, effect, header_text, description_text, url, active_periods,
                 informed_entities, route_ids, stop_ids, effect_status, text_status,
-                derived_status, status_mismatch)
-               VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                derived_status, status_mismatch, advance_notice)
+               VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
                ON CONFLICT (feed, alert_id, version_hash) DO UPDATE SET
+                 -- Derived fields are recomputed so a replay applies improved rules.
+                 route_ids = excluded.route_ids,
+                 effect_status = excluded.effect_status,
+                 text_status = excluded.text_status,
+                 derived_status = excluded.derived_status,
+                 status_mismatch = excluded.status_mismatch,
+                 advance_notice = excluded.advance_notice,
                  first_snapshot_id = CASE WHEN excluded.first_seen_at < v.first_seen_at
                    THEN excluded.first_snapshot_id ELSE v.first_snapshot_id END,
                  first_seen_at = least(v.first_seen_at, excluded.first_seen_at),
@@ -292,6 +299,7 @@ def _normalize_alerts(conn, raw, snapshot, stops):
                 a["text_status"],
                 a["derived_status"],
                 a["status_mismatch"],
+                a["advance_notice"],
             ),
         )
     _claim_newest(conn, raw)
