@@ -6,8 +6,10 @@ import sys
 import psycopg
 from psycopg import sql
 
+from transit import locks
+
 DATABASE_NAME = "airflow_metadata"
-BOOTSTRAP_LOCK = 814_700_017
+BOOTSTRAP_LOCK = locks.AIRFLOW_BOOTSTRAP
 
 
 def main():
