@@ -176,6 +176,7 @@ uv run --locked uvicorn transit.web.app:app --host 127.0.0.1 --port 8000
 - [Public site and API](docs/site.md): endpoints, how positions and gaps are derived, map
 - [Reliability analytics](docs/reliability.md): headways, detected delays, outages
 - [Metric definitions](docs/metrics.md) and [engineering decisions](docs/decisions.md)
+- [Deployment](docs/deploy.md): single-server production setup with HTTPS and backups
 - [Airflow operation](docs/airflow.md), [Windows setup](docs/setup-windows.md),
   [demo walkthrough](docs/demo.md), [source verification](docs/source.md)
 

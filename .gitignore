@@ -21,3 +21,6 @@ airflow/logs/
 artifacts/
 *.log
 .DS_Store
+
+# Production database dumps (deploy/backup.sh)
+/backups/
