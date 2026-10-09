@@ -993,7 +993,7 @@ async function renderPipeline() {
           "p",
           { class: "muted small" },
           `Last hour: ${numberFmt.format(f.last_hour.polls)} polls, ${f.last_hour.failed} failed · `,
-          `${numberFmt.format(f.last_hour.rejected)} records rejected, ${numberFmt.format(f.last_hour.flagged)} flagged by validation`,
+          `${numberFmt.format(f.last_hour.rejected)} ${f.last_hour.rejected === 1 ? "record" : "records"} rejected, ${numberFmt.format(f.last_hour.flagged)} flagged by validation`,
         ),
       ),
     ),
