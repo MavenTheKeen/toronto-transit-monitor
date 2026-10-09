@@ -14,6 +14,7 @@ if sys.platform == "win32":
 pytest.importorskip("airflow.sdk", reason="Install the isolated Airflow test environment")
 
 from airflow.dag_processing.dagbag import DagBag  # noqa: E402
+from airflow.sdk.definitions.timetables.trigger import CronTriggerTimetable  # noqa: E402
 
 
 @pytest.fixture(scope="module")
@@ -30,7 +31,8 @@ def test_real_dag_import_and_scheduling_safety(monitor_dag):
     assert monitor_dag.is_paused_upon_creation is True
     assert monitor_dag.max_active_runs == 1
     assert monitor_dag.max_active_tasks == 1
-    assert monitor_dag.timetable.summary == "*/15 * * * *"
+    assert isinstance(monitor_dag.timetable, CronTriggerTimetable)
+    assert monitor_dag.timetable.expression == "*/15 * * * *"
     assert set(monitor_dag.task_ids) == {"collect", "replay", "transform"}
     assert monitor_dag.get_task("collect").downstream_task_ids == {"replay"}
     assert monitor_dag.get_task("replay").downstream_task_ids == {"transform"}
