@@ -329,7 +329,7 @@ async function renderStation(key) {
     el("div", { class: "grid" }, station.directions.map(arrivalsCard)),
     el("h2", {}, "Alerts at this station"),
     data.alerts.length ? data.alerts.map(alertCard) : el("p", { class: "muted" }, "No alerts for this station, including elevators and escalators."),
-    el("h2", {}, "Nearest Bike Share"),
+    el("h2", { class: "with-link" }, "Nearest Bike Share", el("a", { href: `#/map/${station.key}`, class: "small" }, "View on map")),
     staleNotice(bikes, "Bike Share availability"),
     bikes.docks.length ? el("ul", { class: "grid bare" }, bikes.docks.map(bikeCard)) : el("p", { class: "muted" }, "No Bike Share data yet."),
   ];
@@ -462,6 +462,398 @@ async function renderReliability() {
   ];
 }
 
+// Map: subway lines, stations and Bike Share docks drawn from their coordinates. No map
+// tiles, so the page still makes no third-party requests. Coordinates are projected to
+// metres around the network's centre; the SVG viewBox is the visible area in metres.
+const SVG_NS = "http://www.w3.org/2000/svg";
+const METRES_PER_DEGREE = 111320;
+const MAP_DEFAULT = { lat: 43.6585, lon: -79.385, mpp: 8 }; // Downtown, Union to Bloor.
+const MAP_FOCUS_MPP = 4; // Zoom when opening a station or finding a dock near you.
+const MAP_MIN_MPP = 1;
+const MAP_MAX_MPP = 120;
+const LABELS_ALL_BELOW = 6; // Every station name below this many metres per pixel.
+const LABELS_MAJOR_BELOW = 13; // Interchanges and terminals only, up to this.
+const MAP_REFRESH_MS = 120000; // Bike Share data changes every 15 minutes.
+const MAP_MODES = { bikes: "Find a bike", docks: "Find a dock" };
+// Kept across the 20-second refresh so it does not reset the view or the selection.
+const mapState = {
+  view: null, mode: "bikes", selected: null, focusedKey: null, located: null, busy: false, observer: null, renderedAt: 0,
+};
+
+function fill(node, ...children) {
+  node.replaceChildren(...children.flat(Infinity).filter((c) => c !== null && c !== undefined && c !== false));
+}
+
+function svgEl(tag, attrs = {}, text = null) {
+  const node = document.createElementNS(SVG_NS, tag);
+  for (const [key, value] of Object.entries(attrs)) {
+    if (value !== null && value !== undefined) node.setAttribute(key, value);
+  }
+  if (text !== null) node.textContent = text;
+  return node;
+}
+
+function dockCount(dock, mode) {
+  return mode === "bikes" ? dock.bikes : dock.docks;
+}
+
+function dockClass(dock, mode) {
+  if (!dock.current) return "dock unknown";
+  const count = dockCount(dock, mode);
+  return `dock ${count === 0 ? "none" : count < 3 ? "few" : "ok"}`;
+}
+
+function plural(n, one, many) {
+  return `${n} ${n === 1 ? one : many}`;
+}
+
+function mapLegend(mode) {
+  const what = mode === "bikes" ? ["bikes", "No bikes"] : ["open docks", "No open docks"];
+  return [
+    el("li", {}, el("span", { class: "swatch ok" }), `3+ ${what[0]}`),
+    el("li", {}, el("span", { class: "swatch few" }), "1–2"),
+    el("li", {}, el("span", { class: "swatch none" }), what[1]),
+    el("li", {}, el("span", { class: "swatch unknown" }), "No recent report"),
+    el("li", {}, el("span", { class: "swatch station" }), "Subway station"),
+  ];
+}
+
+async function renderMap(focusKey) {
+  const data = await api("/api/map");
+  mapState.renderedAt = Date.now();
+  const bikes = data.bike_share;
+  const lat0 = data.stations.reduce((sum, s) => sum + s.lat, 0) / data.stations.length;
+  const lon0 = data.stations.reduce((sum, s) => sum + s.lon, 0) / data.stations.length;
+  const kx = Math.cos((lat0 * Math.PI) / 180) * METRES_PER_DEGREE;
+  const project = (lat, lon) => [(lon - lon0) * kx, (lat0 - lat) * METRES_PER_DEGREE];
+  const stations = data.stations.map((s) => ({ ...s, kind: "station", xy: project(s.lat, s.lon) }));
+  const docks = bikes.docks.map((d) => ({ ...d, kind: "dock", xy: project(d.lat, d.lon) }));
+  const terminals = new Set(data.lines.flatMap((l) => [l.path[0], l.path[l.path.length - 1]].map((p) => p.join())));
+  const major = (s) => s.lines.length > 1 || terminals.has([s.lat, s.lon].join());
+
+  const svg = svgEl("svg", {
+    class: "map-svg", role: "img",
+    "aria-label": `Map of ${stations.length} subway stations and ${docks.length} Bike Share docks. Details for the selected item appear below the map.`,
+  });
+  const lineLayer = svgEl("g");
+  for (const line of data.lines) {
+    const points = line.path.map(([lat, lon]) => project(lat, lon).map((v) => v.toFixed(1)).join(",")).join(" ");
+    lineLayer.append(svgEl("polyline", { class: "map-line", points, stroke: line.color || "#777" }));
+  }
+  const dockLayer = svgEl("g");
+  const dockNodes = docks.map((d) => {
+    const node = svgEl("circle", { cx: d.xy[0].toFixed(1), cy: d.xy[1].toFixed(1), class: dockClass(d, mapState.mode) });
+    dockLayer.append(node);
+    return node;
+  });
+  const stationLayer = svgEl("g");
+  const stationNodes = stations.map((s) => {
+    const node = svgEl("circle", { cx: s.xy[0].toFixed(1), cy: s.xy[1].toFixed(1), class: s.lines.length > 1 ? "stn interchange" : "stn" });
+    stationLayer.append(node);
+    return node;
+  });
+  const labelLayer = svgEl("g", { class: "stn-labels", "aria-hidden": "true" });
+  const labelNodes = stations.map((s) => {
+    const node = svgEl("text", { y: s.xy[1].toFixed(1), class: major(s) ? "stn-label major" : "stn-label" }, s.name);
+    labelLayer.append(node);
+    return node;
+  });
+  const selection = svgEl("circle", { class: "sel", r: 0 });
+  const me = svgEl("circle", { class: "me", r: 0 });
+  svg.append(lineLayer, dockLayer, stationLayer, labelLayer, selection, me);
+
+  const panel = el("div", { class: "card map-panel", "aria-live": "polite" });
+  let view = mapState.view ? { ...mapState.view } : null;
+  let lastWidth = null;
+
+  // Before the map is on screen its width is unknown; main's content width is the same.
+  const screenWidth = () => svg.clientWidth || main.clientWidth - 32 || 358;
+
+  function centreOn([x, y], mpp) {
+    const width = mpp * screenWidth();
+    view = { x: x - width / 2, y: y - width / 2, w: width, h: width };
+    fitAspect();
+  }
+  if (focusKey && focusKey !== mapState.focusedKey) {
+    const target = stations.find((s) => s.key === focusKey);
+    if (target) {
+      centreOn(target.xy, MAP_FOCUS_MPP);
+      mapState.selected = { kind: "station", id: target.key };
+    }
+  }
+  mapState.focusedKey = focusKey || null;
+  if (!view) centreOn(project(MAP_DEFAULT.lat, MAP_DEFAULT.lon), MAP_DEFAULT.mpp);
+
+  // Keep the viewBox at the element's aspect ratio so one scale applies to x and y.
+  function fitAspect() {
+    const ratio = svg.clientWidth ? svg.clientHeight / svg.clientWidth : 1;
+    const cy = view.y + view.h / 2;
+    view.h = view.w * ratio;
+    view.y = cy - view.h / 2;
+  }
+
+  function metresPerPixel() {
+    return view.w / screenWidth();
+  }
+
+  function apply() {
+    svg.setAttribute("viewBox", `${view.x} ${view.y} ${view.w} ${view.h}`);
+    mapState.view = { ...view };
+    const mpp = metresPerPixel();
+    if (view.w !== lastWidth) {
+      lastWidth = view.w;
+      const dockPx = mpp > 40 ? 2.5 : mpp > 15 ? 3.5 : mpp > 6 ? 5 : 7;
+      for (const node of dockNodes) node.setAttribute("r", (dockPx * mpp).toFixed(1));
+      for (const node of stationNodes) node.setAttribute("r", ((node.classList.contains("interchange") ? 6 : 4.5) * mpp).toFixed(1));
+      labelLayer.style.fontSize = `${12 * mpp}px`;
+      labelLayer.style.strokeWidth = `${3 * mpp}px`;
+      labelNodes.forEach((node, i) => node.setAttribute("x", (stations[i].xy[0] + 9 * mpp).toFixed(1)));
+      svg.classList.toggle("labels-all", mpp < LABELS_ALL_BELOW);
+      svg.classList.toggle("labels-major", mpp < LABELS_MAJOR_BELOW);
+    }
+    drawMarker(selection, selectedItem(), 11 * mpp);
+    drawMarker(me, mapState.located && { xy: project(mapState.located.lat, mapState.located.lon) }, 7 * mpp);
+  }
+
+  function drawMarker(node, item, radius) {
+    if (!item) {
+      node.setAttribute("r", 0);
+      return;
+    }
+    node.setAttribute("cx", item.xy[0].toFixed(1));
+    node.setAttribute("cy", item.xy[1].toFixed(1));
+    node.setAttribute("r", radius.toFixed(1));
+  }
+
+  function selectedItem() {
+    const sel = mapState.selected;
+    if (!sel) return null;
+    return (sel.kind === "station" ? stations : docks).find((item) => (item.key || item.id) === sel.id) || null;
+  }
+
+  function nearestStation(xy) {
+    let best = null;
+    for (const s of stations) {
+      const d = Math.hypot(s.xy[0] - xy[0], s.xy[1] - xy[1]);
+      if (!best || d < best.d) best = { s, d };
+    }
+    return best;
+  }
+
+  function showPanel(intro = null) {
+    const item = selectedItem();
+    if (!item) {
+      fill(panel, el("p", { class: "muted" }, "Tap a Bike Share dock or a subway station for details. Drag to move, pinch or scroll to zoom."));
+      return;
+    }
+    if (item.kind === "station") {
+      const statuses = item.lines.map((id) => data.lines.find((l) => l.id === id)).filter(Boolean);
+      fill(panel, 
+        el("h2", { class: "with-badge" }, item.name, item.lines.map((l) => badge(l, { small: true }))),
+        statuses.map((l) => el("p", { class: "status-line" }, statusPill(l.status.status, l.status.label), el("span", { class: "source" }, `${l.name} · reported by TTC`))),
+        el("p", {}, el("a", { href: `#/station/${item.key}` }, "Next trains, alerts and nearest docks →")),
+      );
+      return;
+    }
+    const near = nearestStation(item.xy);
+    fill(panel, 
+      intro ? el("p", { class: "source" }, intro) : null,
+      el("h2", {}, item.name),
+      item.current
+        ? el(
+            "p",
+            { class: "bike-stats" },
+            el("span", {}, el("b", {}, item.bikes), item.bikes === 1 ? " bike" : " bikes"),
+            el("span", {}, el("b", {}, item.docks), item.docks === 1 ? " open dock" : " open docks"),
+            item.capacity ? el("span", { class: "muted" }, `${item.capacity} total`) : null,
+          )
+        : el("p", { class: "warn" }, "No recent report from this dock, so availability is unknown."),
+      el("p", { class: "muted small" }, `Dock reported ${timeFmt.format(new Date(item.reported_at))}`),
+      near ? el("p", {}, `${Math.round(near.d / 10) * 10} m from `, el("a", { href: `#/station/${near.s.key}` }, `${near.s.name} station`)) : null,
+    );
+  }
+
+  function select(item, intro = null) {
+    mapState.selected = item ? { kind: item.kind, id: item.key || item.id } : null;
+    showPanel(intro);
+    apply();
+  }
+
+  // One listener handles every feature: a tap picks the nearest station or dock within a
+  // finger's reach, which works better than tiny per-circle targets on a phone.
+  function tap(px, py) {
+    const mpp = metresPerPixel();
+    const x = view.x + px * mpp;
+    const y = view.y + py * mpp;
+    const nearest = (items, reach) => {
+      let best = null;
+      for (const item of items) {
+        const d = Math.hypot(item.xy[0] - x, item.xy[1] - y);
+        if (d <= reach && (!best || d < best.d)) best = { item, d };
+      }
+      return best && best.item;
+    };
+    select(nearest(stations, 16 * mpp) || nearest(docks, 18 * mpp));
+  }
+
+  function zoomAt(factor, px, py) {
+    const width = Math.min(MAP_MAX_MPP, Math.max(MAP_MIN_MPP, metresPerPixel() * factor)) * screenWidth();
+    const f = width / view.w;
+    const mpp = metresPerPixel();
+    const ux = view.x + px * mpp;
+    const uy = view.y + py * mpp;
+    view = { x: ux - (ux - view.x) * f, y: uy - (uy - view.y) * f, w: width, h: view.h * f };
+    apply();
+  }
+
+  const pointers = new Map();
+  let gesture = null;
+  const local = (event) => {
+    const rect = svg.getBoundingClientRect();
+    return [event.clientX - rect.left, event.clientY - rect.top];
+  };
+  svg.addEventListener("pointerdown", (event) => {
+    svg.setPointerCapture(event.pointerId);
+    pointers.set(event.pointerId, local(event));
+    mapState.busy = true;
+    gesture = { start: local(event), moved: 0, at: Date.now(), multi: pointers.size > 1 || (gesture && gesture.multi) };
+  });
+  svg.addEventListener("pointermove", (event) => {
+    if (!pointers.has(event.pointerId)) return;
+    const previous = pointers.get(event.pointerId);
+    const current = local(event);
+    if (pointers.size === 1) {
+      const mpp = metresPerPixel();
+      view.x -= (current[0] - previous[0]) * mpp;
+      view.y -= (current[1] - previous[1]) * mpp;
+      gesture.moved += Math.hypot(current[0] - previous[0], current[1] - previous[1]);
+      pointers.set(event.pointerId, current);
+      apply();
+      return;
+    }
+    const [a, b] = [...pointers.values()];
+    const other = a === previous ? b : a;
+    const before = Math.hypot(previous[0] - other[0], previous[1] - other[1]);
+    const after = Math.hypot(current[0] - other[0], current[1] - other[1]);
+    pointers.set(event.pointerId, current);
+    if (before > 0 && after > 0) zoomAt(before / after, (current[0] + other[0]) / 2, (current[1] + other[1]) / 2);
+  });
+  const release = (event) => {
+    if (!pointers.has(event.pointerId)) return;
+    pointers.delete(event.pointerId);
+    if (pointers.size === 0 && gesture && !gesture.multi && gesture.moved < 8 && Date.now() - gesture.at < 600) tap(...gesture.start);
+    if (pointers.size === 0) {
+      gesture = null;
+      mapState.busy = false;
+    }
+  };
+  svg.addEventListener("pointerup", release);
+  svg.addEventListener("pointercancel", (event) => {
+    pointers.delete(event.pointerId);
+    gesture = null;
+    mapState.busy = pointers.size > 0;
+  });
+  svg.addEventListener("wheel", (event) => {
+    event.preventDefault();
+    zoomAt(Math.exp(event.deltaY * 0.0015), ...local(event));
+  }, { passive: false });
+  mapState.observer?.disconnect();
+  mapState.observer = new ResizeObserver(() => { fitAspect(); lastWidth = null; apply(); });
+  mapState.observer.observe(svg);
+
+  const zoomButton = (label, text, factor) => {
+    const button = el("button", { type: "button", "aria-label": label }, text);
+    button.addEventListener("click", () => zoomAt(factor, svg.clientWidth / 2, svg.clientHeight / 2));
+    return button;
+  };
+  const resetButton = el("button", { type: "button", "aria-label": "Back to downtown" }, "⌂");
+  resetButton.addEventListener("click", () => {
+    centreOn(project(MAP_DEFAULT.lat, MAP_DEFAULT.lon), MAP_DEFAULT.mpp);
+    apply();
+  });
+
+  const container = el(
+    "div",
+    { class: "map-wrap", tabindex: "0", id: "map", "aria-label": "Map. Arrow keys move, plus and minus zoom." },
+    svg,
+    el("div", { class: "map-zoom" }, zoomButton("Zoom in", "+", 0.6), zoomButton("Zoom out", "−", 1 / 0.6), resetButton),
+  );
+  container.addEventListener("keydown", (event) => {
+    const step = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[event.key];
+    if (step) {
+      view.x += step[0] * view.w * 0.15;
+      view.y += step[1] * view.h * 0.15;
+      apply();
+    } else if (event.key === "+" || event.key === "=") zoomAt(0.7, svg.clientWidth / 2, svg.clientHeight / 2);
+    else if (event.key === "-") zoomAt(1 / 0.7, svg.clientWidth / 2, svg.clientHeight / 2);
+    else return;
+    event.preventDefault();
+  });
+
+  const legend = el("ul", { class: "map-legend" }, mapLegend(mapState.mode));
+  const modeButtons = Object.entries(MAP_MODES).map(([mode, label]) => {
+    const button = el("button", { type: "button", class: "seg", "aria-pressed": String(mode === mapState.mode) }, label);
+    button.addEventListener("click", () => {
+      mapState.mode = mode;
+      for (const b of modeButtons) b.setAttribute("aria-pressed", String(b === button));
+      docks.forEach((d, i) => dockNodes[i].setAttribute("class", dockClass(d, mode)));
+      legend.replaceChildren(...mapLegend(mode));
+    });
+    return button;
+  });
+
+  const locateButton = el("button", { type: "button", class: "seg locate" }, "◎ Near me");
+  locateButton.addEventListener("click", () => {
+    if (!navigator.geolocation) {
+      fill(panel, el("p", { class: "warn" }, "This browser cannot share its location."));
+      return;
+    }
+    locateButton.disabled = true;
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        locateButton.disabled = false;
+        mapState.located = { lat: position.coords.latitude, lon: position.coords.longitude };
+        const here = project(mapState.located.lat, mapState.located.lon);
+        const usable = docks.filter((d) => d.current && dockCount(d, mapState.mode) > 0);
+        let best = null;
+        for (const d of usable) {
+          const dist = Math.hypot(d.xy[0] - here[0], d.xy[1] - here[1]);
+          if (!best || dist < best.dist) best = { d, dist };
+        }
+        centreOn(here, MAP_FOCUS_MPP);
+        const what = mapState.mode === "bikes" ? "with bikes" : "with open docks";
+        if (best && best.dist < 20000) select(best.d, `Nearest dock ${what}, about ${Math.round(best.dist / 10) * 10} m away in a straight line`);
+        else select(null);
+      },
+      () => {
+        locateButton.disabled = false;
+        fill(panel, el("p", { class: "warn" }, "Your location is unavailable. Check the browser's location permission."));
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 },
+    );
+  });
+
+  const reporting = docks.filter((d) => d.current);
+  const withBikes = reporting.filter((d) => d.bikes > 0).length;
+  const full = reporting.filter((d) => d.docks === 0).length;
+  showPanel();
+  return [
+    el("h1", {}, "Map"),
+    staleNotice(bikes, "Bike Share availability"),
+    el("div", { class: "map-tools" }, el("div", { class: "segmented", role: "group", "aria-label": "Colour docks by" }, modeButtons), locateButton),
+    container,
+    legend,
+    panel,
+    el(
+      "p",
+      { class: "muted small" },
+      `${plural(reporting.length, "dock", "docks")} reporting: ${withBikes} with bikes, ${reporting.length - withBikes} empty, ${full} full. `,
+      bikes.as_of ? `Bike Share collected ${timeFmt.format(new Date(bikes.as_of))}, every 15 minutes. ` : "",
+      "Lines are drawn straight between stations. Your location stays in this browser; it is never sent to the server. Each station page lists its nearest docks.",
+    ),
+  ];
+}
+
 // A periodic refresh must not throw away what the visitor is doing: typed search text,
 // focus, open panels and scroll position are carried over to the new content.
 function captureState() {
@@ -494,7 +886,7 @@ function restoreState(state) {
 function markCurrentNav(kind, id) {
   for (const link of document.querySelectorAll("#line-nav a")) {
     const href = link.getAttribute("href");
-    const current = (kind === "line" && href === `#/line/${id}`) || (kind === "reliability" && href === "#/reliability");
+    const current = (kind === "line" && href === `#/line/${id}`) || href === `#/${kind}`;
     if (current) link.setAttribute("aria-current", "page");
     else link.removeAttribute("aria-current");
   }
@@ -510,6 +902,7 @@ async function route({ refresh = false } = {}) {
       stationLines = new Map(lineData.stations.map((s) => [s.key, s.lines]));
       document.getElementById("line-nav").replaceChildren(
         ...lines.map((l) => badge(l.id)),
+        el("a", { href: "#/map", class: "navlink" }, "Map"),
         el("a", { href: "#/reliability", class: "navlink" }, "Reliability"),
       );
     }
@@ -517,6 +910,7 @@ async function route({ refresh = false } = {}) {
     if (kind === "line" && id) content = await renderLine(id);
     else if (kind === "station" && id) content = await renderStation(id);
     else if (kind === "reliability") content = await renderReliability();
+    else if (kind === "map") content = await renderMap(id);
     else content = await renderHome();
     if (seq !== renderSeq) return; // A newer navigation or refresh finished first.
     const state = refresh ? captureState() : null;
@@ -540,5 +934,10 @@ async function route({ refresh = false } = {}) {
 window.addEventListener("hashchange", () => {
   route().then(() => { window.scrollTo(0, 0); main.focus({ preventScroll: true }); });
 });
-setInterval(() => { if (document.visibilityState === "visible") route({ refresh: true }); }, REFRESH_MS);
+setInterval(() => {
+  // Skip a refresh in the middle of a map drag or pinch rather than interrupt it.
+  if (document.visibilityState !== "visible" || mapState.busy) return;
+  if (location.hash.startsWith("#/map") && Date.now() - mapState.renderedAt < MAP_REFRESH_MS) return;
+  route({ refresh: true });
+}, REFRESH_MS);
 route();

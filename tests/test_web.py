@@ -228,6 +228,23 @@ def test_station_page_has_arrivals_alerts_and_bikes(client):
 
 
 @pytest.mark.integration
+def test_map_has_line_paths_stations_and_every_dock(client):
+    response = client.get("/api/map", headers={"Accept-Encoding": "gzip"})
+    assert response.headers["content-encoding"] == "gzip"
+    body = response.json()
+    line_one = next(line for line in body["lines"] if line["id"] == "1")
+    assert line_one["status"]["status"] == "delays"
+    assert len(line_one["path"]) == len(client.get("/api/lines/1").json()["stations"])
+    bloor = next(s for s in body["stations"] if s["key"] == "bloor-yonge")
+    assert bloor["lines"] == ["1", "2"] and -80 < bloor["lon"] < -79
+    docks = body["bike_share"]["docks"]
+    assert len(docks) == 2
+    for dock in docks:
+        # A dock without a current report carries no availability claim.
+        assert dock["current"] or (dock["bikes"] is None and dock["docks"] is None)
+
+
+@pytest.mark.integration
 def test_health_and_page(client):
     health = client.get("/health").json()
     assert health["status"] == "ok"

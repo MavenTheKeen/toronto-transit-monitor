@@ -5,6 +5,7 @@ import math
 import re
 from datetime import datetime, timedelta
 
+from bikeshare.config import FUTURE_TOLERANCE_SECONDS, STALE_SECONDS
 from bikeshare.ttc.realtime import TORONTO, service_date
 
 PREDICTIONS_STALE = timedelta(minutes=2)
@@ -458,6 +459,78 @@ def nearest_bikes(conn, lat: float, lon: float, now: datetime, limit: int = 2) -
             }
             for r in rows
         ],
+    }
+
+
+def map_network(conn, version: str) -> dict:
+    """Subway stations with coordinates, and each line as its stations in order."""
+    rows = conn.execute(
+        """SELECT ls.route_id, ls.stop_order, s.station_key, s.station_name,
+                  avg(s.lat) OVER (PARTITION BY s.station_key) AS lat,
+                  avg(s.lon) OVER (PARTITION BY s.station_key) AS lon
+           FROM normalized.ttc_line_stops ls
+           JOIN normalized.ttc_stops s USING (feed_version, stop_id)
+           WHERE ls.feed_version = %s AND ls.direction_id = 0
+           ORDER BY ls.route_id::int, ls.stop_order""",
+        (version,),
+    ).fetchall()
+    paths, stations = {}, {}
+    for r in rows:
+        point = [round(r["lat"], 5), round(r["lon"], 5)]
+        paths.setdefault(r["route_id"], []).append(point)
+        station = stations.setdefault(
+            r["station_key"],
+            {
+                "key": r["station_key"],
+                "name": r["station_name"],
+                "lat": point[0],
+                "lon": point[1],
+                "lines": [],
+            },
+        )
+        station["lines"].append(r["route_id"])
+    return {"paths": paths, "stations": list(stations.values())}
+
+
+def bike_docks(conn, now: datetime) -> dict:
+    """Every dock in the latest successful Bike Share collection. As on the dashboard, a
+    dock that is not installed or whose own report is stale has no current availability."""
+    rows = conn.execute(
+        """WITH latest AS (
+             SELECT collection_id, collected_at FROM ops.ingestion_runs
+             WHERE status = 'succeeded' ORDER BY collected_at DESC LIMIT 1)
+           SELECT s.station_id, s.name, s.lat, s.lon, s.capacity, o.num_bikes_available,
+                  o.num_docks_available, o.is_installed, o.is_renting, o.is_returning,
+                  o.station_reported_at, l.collected_at
+           FROM latest l
+           JOIN normalized.station_snapshots s USING (collection_id)
+           JOIN normalized.observations o USING (collection_id, station_id)
+           ORDER BY s.station_id""",
+    ).fetchall()
+    collected_at = rows[0]["collected_at"] if rows else None
+    docks = []
+    for r in rows:
+        age = (now - r["station_reported_at"]).total_seconds()
+        current = r["is_installed"] and -FUTURE_TOLERANCE_SECONDS <= age <= STALE_SECONDS
+        docks.append(
+            {
+                "id": r["station_id"],
+                "name": r["name"],
+                "lat": round(r["lat"], 5),
+                "lon": round(r["lon"], 5),
+                "capacity": r["capacity"],
+                "current": current,
+                "bikes": (r["num_bikes_available"] if r["is_renting"] else 0) if current else None,
+                "docks": (r["num_docks_available"] if r["is_returning"] else 0)
+                if current
+                else None,
+                "reported_at": r["station_reported_at"],
+            }
+        )
+    return {
+        "as_of": collected_at,
+        "stale": collected_at is None or now - collected_at > BIKESHARE_STALE,
+        "docks": docks,
     }
 
 

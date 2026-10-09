@@ -14,6 +14,7 @@ from importlib.resources import files
 
 import psycopg
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -92,6 +93,7 @@ def create_app(database_url: str | None = None, clock=lambda: datetime.now(UTC))
                     lines=queries.lines(conn, version),
                     stations=queries.all_stations(conn, version),
                     segments=queries.segment_seconds(conn, version),
+                    network=queries.map_network(conn, version),
                 )
             return dict(static_cache)
 
@@ -126,6 +128,9 @@ def create_app(database_url: str | None = None, clock=lambda: datetime.now(UTC))
             return cache.get(key, compute)
         except queries.NotFound as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    # The map response lists every Bike Share dock (~200 KB); compressed it is a fraction.
+    app.add_middleware(GZipMiddleware, minimum_size=1000)
 
     @app.middleware("http")
     async def protect(request: Request, call_next):
@@ -255,6 +260,23 @@ def create_app(database_url: str | None = None, clock=lambda: datetime.now(UTC))
             }
 
         return cached(f"station:{key}", build)
+
+    @app.get("/api/map")
+    def network_map():
+        def build(conn, now):
+            static, _, _, statuses = overview(conn, now)
+            by_line = {s["line"]: s for s in statuses}
+            network = static["network"]
+            return {
+                "lines": [
+                    {**line, "status": by_line[line["id"]], "path": network["paths"][line["id"]]}
+                    for line in static["lines"]
+                ],
+                "stations": network["stations"],
+                "bike_share": queries.bike_docks(conn, now),
+            }
+
+        return cached("map", build)
 
     @app.get("/api/reliability")
     def reliability():

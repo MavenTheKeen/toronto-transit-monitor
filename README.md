@@ -142,7 +142,8 @@ and the source quirks found in the live feed. Data: Toronto Transit Commission.
 A FastAPI service exposes read-only JSON endpoints and a mobile-first page: service
 status per line (reported by TTC, plus our own clearly labelled detected delays), active alerts and planned closures, a line diagram with estimated
 train positions and unusually long gaps, and station pages with next arrivals,
-elevator/escalator outages and the nearest Bike Share dock.
+elevator/escalator outages and the nearest Bike Share dock, and a map of the subway
+with every Bike Share dock coloured by bikes or open docks available.
 
 ```powershell
 docker compose up -d web

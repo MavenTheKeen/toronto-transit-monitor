@@ -8,11 +8,12 @@ docker compose up -d web
 ```
 
 Open <http://localhost:8000>. Pages use hash routes: `#/` (service status), `#/line/1`
-(line view), `#/station/bloor-yonge` (station), `#/reliability` (reliability).
+(line view), `#/station/bloor-yonge` (station), `#/map` (subway and Bike Share map; `#/map/bloor-yonge`
+opens it on a station), `#/reliability` (reliability).
 
-| Home | Line | Station | Reliability |
-| --- | --- | --- | --- |
-| ![Service status](screenshots/site-home.png) | ![Line 1 diagram](screenshots/site-line1.png) | ![Bloor-Yonge](screenshots/site-station.png) | ![Reliability](screenshots/site-reliability.png) |
+| Home | Line | Station | Map | Reliability |
+| --- | --- | --- | --- | --- |
+| ![Service status](screenshots/site-home.png) | ![Line 1 diagram](screenshots/site-line1.png) | ![Bloor-Yonge](screenshots/site-station.png) | ![Subway and Bike Share map](screenshots/site-map.png) | ![Reliability](screenshots/site-reliability.png) |
 
 Screenshots were captured from real data on 2026-10-09 at about 11:10 Toronto time,
 about 1 h 45 min after collection started.
@@ -26,6 +27,7 @@ about 1 h 45 min after collection started.
 | `/api/lines` | Lines with colours, directions and status, plus every station for search. |
 | `/api/lines/{id}` | Stations in order, estimated train positions, gaps between consecutive trains, and the scheduled headway now. |
 | `/api/stations/{key}` | Next arrivals per platform, alerts naming the station's platforms, line status, and the nearest Bike Share docks. |
+| `/api/map` | Each line's path through its stations, station coordinates, and every Bike Share dock from the latest collection with bikes, open docks and capacity. |
 | `/api/reliability` | Longest gaps today, regular-headway share by hour (today and 7 days), and elevator/escalator outages, from the dbt models. `available: false` until the first build. |
 | `/health` | `ok`, `degraded` (predictions older than 2 minutes), `no_data` (no schedule loaded), or HTTP 503 if PostgreSQL is unreachable. |
 
@@ -52,10 +54,24 @@ Reliability metrics and detected delays are defined in [reliability analytics](r
   do not change today's status, because TTC sets their active period to the whole notice
   window rather than the closure hours.
 
+## Map
+
+The map draws subway lines, stations and every Bike Share dock from their own coordinates
+in SVG, with no map tiles, so the page still makes no third-party requests. Docks are
+coloured by bikes available ("Find a bike") or open docks ("Find a dock"). A dock that is
+not installed, or whose own report is more than 30 minutes old, is grey and makes no
+availability claim, the same rule the dashboard uses. Tapping picks the nearest station or
+dock within finger reach. "Near me" uses the browser's location to select the nearest dock
+with bikes (or open docks); the location stays in the browser. Lines are drawn straight
+between stations. The map refreshes every 2 minutes rather than every 20 seconds, since
+Bike Share data changes every 15 minutes, and never during a drag or pinch.
+
 ## Protection
 
 - Responses are cached in memory for 15 seconds, so PostgreSQL load does not grow with
   visitors. Schedule-derived data is cached until a new static GTFS version loads.
+- Responses over 1 KB are gzip-compressed (the map's dock list shrinks from about
+  200 KB to 35 KB).
 - `/api/` allows `WEB_RATE_LIMIT_PER_MINUTE` (default 120) requests per client address
   per sliding minute, then returns 429 with `Retry-After`.
 - A strict Content Security Policy allows only same-origin scripts, styles and requests.
