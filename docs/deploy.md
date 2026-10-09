@@ -59,6 +59,7 @@ dc --profile tools --profile airflow build
 dc --profile airflow up -d --wait
 dc exec airflow airflow dags unpause toronto_bikeshare_reliability
 dc exec airflow airflow dags unpause ttc_static_gtfs
+dc exec airflow airflow dags unpause open_data_export
 ```
 
 The site is then at `https://<SITE_ADDRESS>`. The first certificate takes a few seconds.

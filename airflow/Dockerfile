@@ -7,9 +7,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     UV_PYTHON_DOWNLOADS=never
 
 USER root
-RUN mkdir -p /app /opt/app-venv /opt/dbt-venv /opt/airflow/state \
-    && chown airflow:root /app /opt/app-venv /opt/dbt-venv /opt/airflow/state \
-    && chmod g+w /app /opt/app-venv /opt/dbt-venv /opt/airflow/state
+RUN mkdir -p /app /opt/app-venv /opt/dbt-venv /opt/airflow/state /opt/airflow/open-data \
+    && chown airflow:root /app /opt/app-venv /opt/dbt-venv /opt/airflow/state /opt/airflow/open-data \
+    && chmod g+w /app /opt/app-venv /opt/dbt-venv /opt/airflow/state /opt/airflow/open-data
 USER airflow
 
 WORKDIR /app

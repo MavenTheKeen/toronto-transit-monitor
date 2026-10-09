@@ -12,8 +12,8 @@ Both pipelines land raw responses in PostgreSQL, validate and normalize them in 
 separate step that can be replayed from storage, and feed dbt models for reliability
 metrics. Two front ends read the results: **Toronto Transit Now**, a public-facing,
 mobile-first site (service status, live line diagrams, station arrivals, a subway and
-Bike Share map, reliability analytics), and a Streamlit dashboard for Bike Share
-operations.
+Bike Share map, reliability analytics, a pipeline status page and daily open-data
+downloads), and a Streamlit dashboard for Bike Share operations.
 
 **Status:** runs locally with Docker Compose and has collected real data since
 2026-10-09. It is not publicly hosted yet.
@@ -103,6 +103,7 @@ docker compose --profile airflow build airflow
 docker compose --profile airflow up -d airflow
 docker compose exec airflow airflow dags unpause toronto_bikeshare_reliability
 docker compose exec airflow airflow dags unpause ttc_static_gtfs
+docker compose exec airflow airflow dags unpause open_data_export
 ```
 
 Airflow's UI is at <http://localhost:8080>; it is a local development instance and all
@@ -175,6 +176,7 @@ uv run --locked uvicorn transit.web.app:app --host 127.0.0.1 --port 8000
 - [Bike Share collection and dashboard](docs/bikeshare.md): retry/replay, metric caveats
 - [Public site and API](docs/site.md): endpoints, how positions and gaps are derived, map
 - [Reliability analytics](docs/reliability.md): headways, detected delays, outages
+- [Open data](docs/datasets.md): daily Parquet/CSV downloads, columns, licence
 - [Metric definitions](docs/metrics.md) and [engineering decisions](docs/decisions.md)
 - [Deployment](docs/deploy.md): single-server production setup with HTTPS and backups
 - [Airflow operation](docs/airflow.md), [Windows setup](docs/setup-windows.md),

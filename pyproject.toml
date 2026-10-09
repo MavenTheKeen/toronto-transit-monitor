@@ -17,6 +17,7 @@ dependencies = [
   "gtfs-realtime-bindings==2.2.0",
   "fastapi==0.141.1",
   "uvicorn==0.53.0",
+  "pyarrow==26.0.0", # Open-data Parquet and CSV files (already locked via Streamlit).
 ]
 
 [project.scripts]

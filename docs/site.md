@@ -30,6 +30,7 @@ about 2 h 30 min after collection started.
 | `/api/map` | Each line's path through its stations, station coordinates, and every Bike Share dock from the latest collection with bikes, open docks and capacity. |
 | `/api/reliability` | Longest gaps today, regular-headway share by hour (today and 7 days), and elevator/escalator outages, from the dbt models. `available: false` until the first build. |
 | `/api/pipeline` | Health of each TTC feed, Bike Share collection and the dbt build (`ok`, `delayed` or `failing` by time since the last success), today's feed dropout rate, the latest data-quality checks and data volume. Shown at `#/pipeline`. |
+| `/api/datasets` | The open-data index: datasets, column descriptions, and every published file with rows and checksums. `available: false` before the first export. Files are served under `/data/`. See [open data](datasets.md). |
 | `/health` | `ok`, `degraded` (predictions older than 2 minutes), `no_data` (no schedule loaded), or HTTP 503 if PostgreSQL is unreachable. |
 
 Every response includes `generated_at` and the attribution. Freshness objects

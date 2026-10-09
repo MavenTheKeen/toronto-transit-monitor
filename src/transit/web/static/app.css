@@ -290,6 +290,13 @@ table.hours { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
 .facts dt { color: var(--muted); }
 .facts dd { margin: 0; font-weight: 600; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 
+/* Downloads */
+.downloads { list-style: none; padding: 0; margin: 8px 0; }
+.downloads li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 12px; padding: 6px 0; border-top: 1px solid var(--border); }
+.downloads .links { display: inline-flex; gap: 12px; margin-left: auto; }
+.facts.columns dd { font-weight: 400; }
+.facts.columns code { font-size: 0.85rem; }
+
 /* Footer */
 .updated { color: var(--muted); font-size: 0.85rem; margin-top: 24px; }
 .updated.warn { color: var(--warn); }

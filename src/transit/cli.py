@@ -4,7 +4,9 @@ import argparse
 import json
 import os
 import sys
+from datetime import UTC, date, datetime
 
+from transit import exports
 from transit.bikeshare.ingestion import CollectionBusy, run
 from transit.bikeshare.parsing import FeedValidationError, discover, parse_information, parse_status
 from transit.config import DISCOVERY_URL, WEB_DB_ROLE, Settings
@@ -39,6 +41,12 @@ def main():
     commands.add_parser("ttc-retention", help="Delete expired TTC raw snapshots and history")
     commands.add_parser("ttc-smoke", help="Explicit live TTC parse check; writes no data")
     commands.add_parser("ttc-health", help="Exit 1 unless every TTC feed polled in 2 minutes")
+    export = commands.add_parser("export", help="Write completed days as open-data files")
+    export.add_argument("--out", default=os.environ.get("EXPORT_DIR", "exports"))
+    export.add_argument(
+        "--day", type=date.fromisoformat, action="append", help="YYYY-MM-DD; repeatable"
+    )
+    export.add_argument("--force", action="store_true", help="Rewrite days already exported")
     args = parser.parse_args()
     try:
         if args.command == "ttc-smoke":
@@ -70,6 +78,10 @@ def main():
             settings = Settings.from_env()
             if args.command.startswith("ttc-"):
                 result = run_ttc(args, settings.database_url)
+            elif args.command == "export":
+                result = exports.export(
+                    settings.database_url, args.out, datetime.now(UTC), args.day, args.force
+                )
             elif args.command == "init-db":
                 result = {"schema": "ready", "migrations_applied": init_db(settings.database_url)}
                 # Deployments give the public site its own read-only login.

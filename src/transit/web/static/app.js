@@ -410,12 +410,84 @@ function outageItem(o) {
 
 const OUTAGES_SHOWN = 6;
 
+
+// Open-data downloads listed from /api/datasets (the export's index.json).
+const fileDayFmt = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "UTC", weekday: "short", month: "short", day: "numeric", year: "numeric",
+});
+
+function sizeText(bytes) {
+  return bytes >= 1e6 ? `${(bytes / 1e6).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1e3))} KB`;
+}
+
+function downloadSection(sets) {
+  if (!sets.available) return null;
+  const shown = 7;
+  return [
+    el("h2", { id: "download" }, "Download the data"),
+    el(
+      "p",
+      { class: "muted" },
+      "Daily files from this project's own collection, free to reuse with attribution. ",
+      "Parquet for analysis tools, gzipped CSV for spreadsheets.",
+    ),
+    sets.datasets
+      .filter((d) => d.files.length)
+      .map((d) =>
+        el(
+          "section",
+          { class: "card" },
+          el("h3", {}, d.title),
+          el("p", { class: "muted small" }, d.description, d.day ? ` One file per day (${d.day}).` : ""),
+          el(
+            "ul",
+            { class: "downloads" },
+            d.files.slice(0, shown).map((f) =>
+              el(
+                "li",
+                {},
+                el("span", {}, f.day ? fileDayFmt.format(new Date(`${f.day}T00:00:00Z`)) : "All to date", f.partial ? " (partial day)" : ""),
+                el("span", { class: "muted small" }, `${numberFmt.format(f.rows)} rows`),
+                el(
+                  "span",
+                  { class: "links" },
+                  el("a", { href: `/data/${f.files.parquet.path}`, download: "" }, `Parquet, ${sizeText(f.files.parquet.bytes)}`),
+                  el("a", { href: `/data/${f.files.csv.path}`, download: "" }, `CSV, ${sizeText(f.files.csv.bytes)}`),
+                ),
+              ),
+            ),
+          ),
+          d.files.length > shown
+            ? el("p", { class: "muted small" }, `${d.files.length - shown} earlier files are listed in `, el("a", { href: "/data/index.json" }, "index.json"), ".")
+            : null,
+          el(
+            "details",
+            { "data-key": `columns-${d.name}` },
+            el("summary", {}, "Columns"),
+            el("dl", { class: "facts columns" }, Object.entries(d.columns).map(([name, text]) => [el("dt", {}, el("code", {}, name)), el("dd", {}, text)])),
+          ),
+        ),
+      ),
+    el(
+      "p",
+      { class: "muted small" },
+      sets.licence,
+      " ",
+      el("a", { href: sets.licence_url }, "Licence terms"),
+      ". Row counts and SHA-256 checksums for every file are in ",
+      el("a", { href: "/data/index.json" }, "index.json"),
+      ".",
+    ),
+  ];
+}
+
 async function renderReliability() {
-  const data = await api("/api/reliability");
+  const [data, sets] = await Promise.all([api("/api/reliability"), api("/api/datasets")]);
   if (!data.available) {
     return [
       el("h1", {}, "Reliability"),
       el("p", {}, "Reliability analytics have not been built yet. They appear after the first scheduled transformation."),
+      downloadSection(sets),
     ];
   }
   const coverage = data.coverage;
@@ -459,6 +531,7 @@ async function renderReliability() {
           el("p", { class: "muted small" }, "≥ means the outage was already in progress when collection started."),
         )
       : null,
+    downloadSection(sets),
   ];
 }
 

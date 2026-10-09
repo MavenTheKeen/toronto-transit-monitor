@@ -22,7 +22,11 @@ def dag_bag():
     folder = Path(__file__).resolve().parents[1] / "dags"
     bag = DagBag(dag_folder=str(folder), safe_mode=False)
     assert bag.import_errors == {}
-    assert set(bag.dags) == {"toronto_bikeshare_reliability", "ttc_static_gtfs"}
+    assert set(bag.dags) == {
+        "toronto_bikeshare_reliability",
+        "ttc_static_gtfs",
+        "open_data_export",
+    }
     return bag
 
 
@@ -46,6 +50,19 @@ def test_ttc_static_refresh_is_daily_and_shell_free(dag_bag, monkeypatch):
     assert calls == [
         (["/opt/app-venv/bin/transit", "ttc-gtfs-refresh"], {"check": True, "timeout": 840})
     ]
+
+
+def test_open_data_export_runs_daily_after_the_service_day(dag_bag, monkeypatch):
+    dag = dag_bag.dags["open_data_export"]
+    assert dag.catchup is False and dag.is_paused_upon_creation is True
+    assert dag.timetable.expression == "30 9 * * *"
+    export = dag.get_task("export").python_callable
+    calls = []
+    monkeypatch.setattr(
+        export.__globals__["subprocess"], "run", lambda args, **kw: calls.append((args, kw))
+    )
+    export()
+    assert calls == [(["/opt/app-venv/bin/transit", "export"], {"check": True, "timeout": 1140})]
 
 
 def test_real_dag_import_and_scheduling_safety(monitor_dag):

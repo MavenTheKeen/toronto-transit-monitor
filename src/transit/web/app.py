@@ -5,12 +5,14 @@ visitors. A small per-IP limit protects the process. Browsers only talk to this
 service; it never calls the TTC.
 """
 
+import json
 import os
 import threading
 import time
 from collections import deque
 from datetime import UTC, datetime
 from importlib.resources import files
+from pathlib import Path
 
 import psycopg
 from fastapi import FastAPI, HTTPException, Request
@@ -69,8 +71,14 @@ class RateLimiter:
             return True
 
 
-def create_app(database_url: str | None = None, clock=lambda: datetime.now(UTC)) -> FastAPI:
+def create_app(
+    database_url: str | None = None,
+    clock=lambda: datetime.now(UTC),
+    export_dir: str | None = None,
+) -> FastAPI:
     app = FastAPI(title="Toronto Transit Now", docs_url=None, redoc_url=None, openapi_url=None)
+    # Open-data files written by `transit export`; optional, served at /data/.
+    export_dir = export_dir or os.environ.get("EXPORT_DIR")
     cache = TTLCache(CACHE_SECONDS)
     limiter = RateLimiter(RATE_LIMIT)
     static_cache = {}
@@ -148,6 +156,8 @@ def create_app(database_url: str | None = None, clock=lambda: datetime.now(UTC))
         response.headers["Referrer-Policy"] = "no-referrer"
         if request.url.path.startswith("/api/") and response.status_code == 200:
             response.headers["Cache-Control"] = f"public, max-age={CACHE_SECONDS}"
+        elif request.url.path.startswith("/data/") and response.status_code == 200:
+            response.headers["Cache-Control"] = "public, max-age=3600"
         return response
 
     @app.get("/health")
@@ -293,11 +303,24 @@ def create_app(database_url: str | None = None, clock=lambda: datetime.now(UTC))
 
         return cached("reliability", build)
 
+    @app.get("/api/datasets")
+    def datasets():
+        def load():
+            index = Path(export_dir) / "index.json" if export_dir else None
+            if index is None or not index.is_file():
+                return {"available": False}
+            return {"available": True, **json.loads(index.read_text(encoding="utf-8"))}
+
+        return cache.get("datasets", load)
+
     @app.get("/", include_in_schema=False)
     def index():
         return FileResponse(STATIC.joinpath("index.html"), headers={"Cache-Control": "no-cache"})
 
     app.mount("/static", StaticFiles(directory=str(STATIC)), name="static")
+    if export_dir:
+        # check_dir=False: the folder may not exist until the first export runs.
+        app.mount("/data", StaticFiles(directory=export_dir, check_dir=False), name="data")
     return app
 
 

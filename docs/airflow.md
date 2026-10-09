@@ -39,6 +39,13 @@ execution timeout. An HTTP Retry-After deadline is stored in PostgreSQL and also
 applies to later Airflow retries. Failed tasks remain failed visibly; no empty
 dataset is substituted.
 
+Two more DAGs run daily, each also paused until unpaused:
+
+| DAG | Schedule (UTC) | Runs |
+| --- | --- | --- |
+| `ttc_static_gtfs` | 09:00 | `ttc-gtfs-refresh`: loads TTC's static schedule as a new version only if the zip changed |
+| `open_data_export` | 09:30 | `export`: writes completed days as [open-data files](datasets.md), catching up any missed days |
+
 The collection ID hashes DAG ID + run ID. Clearing a task reuses stored raw data.
 The collected timestamp is the actual HTTP acquisition time, never the logical
 date. Do not backfill a live feed to try to create historical observations.
