@@ -74,6 +74,28 @@ services:
       start_period: 30s
     restart: unless-stopped
 
+  ttc-collector:
+    <<: *app
+    command: ["ttc-collect"]
+    environment:
+      <<: *app-environment
+      TTC_POLL_SECONDS: ${TTC_POLL_SECONDS:-30}
+      TTC_RAW_RETENTION_DAYS: ${TTC_RAW_RETENTION_DAYS:-3}
+      TTC_EVENT_RETENTION_DAYS: ${TTC_EVENT_RETENTION_DAYS:-90}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      init-db:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "bikeshare", "ttc-health"]
+      interval: 60s
+      timeout: 15s
+      retries: 3
+      start_period: 120s
+    restart: unless-stopped
+    stop_grace_period: 40s
+
   dbt:
     image: toronto-bikeshare-transform:local
     build:
