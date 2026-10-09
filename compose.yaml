@@ -1,11 +1,11 @@
-name: toronto-bikeshare
+name: toronto-transit
 
 x-app: &app
-  image: toronto-bikeshare-app:local
+  image: toronto-transit-app:local
   build:
     context: .
   environment: &app-environment
-    DATABASE_URL: postgresql://bikeshare:${POSTGRES_PASSWORD:?Copy .env.example to .env and set POSTGRES_PASSWORD}@postgres:5432/bikeshare
+    DATABASE_URL: postgresql://transit:${POSTGRES_PASSWORD:?Copy .env.example to .env and set POSTGRES_PASSWORD}@postgres:5432/transit
     GBFS_DISCOVERY_URL: ${GBFS_DISCOVERY_URL:-https://toronto.publicbikesystem.net/customer/gbfs/v3.0/gbfs.json}
     TZ: UTC
 
@@ -13,8 +13,8 @@ services:
   postgres:
     image: postgres:16.15-bookworm@sha256:0ea6700a3b4f0ae6ce746519073558aed4d88a79d8d07622a9a644946c7319c4
     environment:
-      POSTGRES_USER: bikeshare
-      POSTGRES_DB: bikeshare
+      POSTGRES_USER: transit
+      POSTGRES_DB: transit
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Copy .env.example to .env and set POSTGRES_PASSWORD}
       TZ: UTC
       PGTZ: UTC
@@ -23,7 +23,7 @@ services:
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U bikeshare -d bikeshare"]
+      test: ["CMD-SHELL", "pg_isready -U transit -d transit"]
       interval: 5s
       timeout: 5s
       retries: 12
@@ -123,7 +123,7 @@ services:
     restart: unless-stopped
 
   dbt:
-    image: toronto-bikeshare-transform:local
+    image: toronto-transit-transform:local
     build:
       context: .
       dockerfile: docker/transform.Dockerfile
@@ -147,7 +147,7 @@ services:
     restart: "no"
 
   airflow:
-    image: toronto-bikeshare-airflow:local
+    image: toronto-transit-airflow:local
     build:
       context: .
       dockerfile: airflow/Dockerfile
@@ -155,7 +155,7 @@ services:
     environment:
       <<: *app-environment
       AIRFLOW_CONFIG: /opt/airflow/state/airflow.cfg
-      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://bikeshare:${POSTGRES_PASSWORD:?Copy .env.example to .env and set POSTGRES_PASSWORD}@postgres:5432/airflow_metadata
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://transit:${POSTGRES_PASSWORD:?Copy .env.example to .env and set POSTGRES_PASSWORD}@postgres:5432/airflow_metadata
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__CORE__PARALLELISM: "2"
       AIRFLOW__CORE__LOAD_EXAMPLES: "false"

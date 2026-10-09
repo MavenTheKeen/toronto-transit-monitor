@@ -59,7 +59,7 @@ The collector should return `already_succeeded`. It reuses the successful
 collection without refetching or adding observations. Inspect the database:
 
 ```powershell
-docker compose exec postgres psql -U bikeshare -d bikeshare -c "SELECT collection_id, count(*) FROM normalized.observations GROUP BY collection_id ORDER BY collection_id;"
+docker compose exec postgres psql -U transit -d transit -c "SELECT collection_id, count(*) FROM normalized.observations GROUP BY collection_id ORDER BY collection_id;"
 ```
 
 Replay preserves the collection identity and uses stored source JSON:

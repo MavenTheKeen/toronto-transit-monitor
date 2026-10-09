@@ -165,8 +165,8 @@ With Python/uv installed, and Compose PostgreSQL running:
 ```powershell
 uv sync --locked
 uv sync --project dbt --locked
-docker compose exec postgres createdb -U bikeshare bikeshare_test
-$env:TEST_DATABASE_URL='postgresql://bikeshare:YOUR_ENV_PASSWORD@127.0.0.1:5432/bikeshare_test'
+docker compose exec postgres createdb -U transit transit_test
+$env:TEST_DATABASE_URL='postgresql://transit:YOUR_ENV_PASSWORD@127.0.0.1:5432/transit_test'
 $env:DBT_EXECUTABLE="$PWD/dbt/.venv/Scripts/dbt.exe"
 uv run --locked pytest -q
 uv run --locked ruff check src tests dashboard scripts airflow
@@ -193,7 +193,7 @@ docker compose run --rm collector smoke
 Native application commands use `DATABASE_URL` (the app does not auto-load `.env`):
 
 ```powershell
-$env:DATABASE_URL='postgresql://bikeshare:YOUR_ENV_PASSWORD@127.0.0.1:5432/bikeshare'
+$env:DATABASE_URL='postgresql://transit:YOUR_ENV_PASSWORD@127.0.0.1:5432/transit'
 uv run --locked transit init-db
 uv run --locked transit collect
 uv run --locked transit transform --dbt-executable "$PWD/dbt/.venv/Scripts/dbt.exe"

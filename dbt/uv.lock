@@ -48,7 +48,7 @@ wheels = [
 ]
 
 [[package]]
-name = "bikeshare-dbt"
+name = "transit-dbt"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [

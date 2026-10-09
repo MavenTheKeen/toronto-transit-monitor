@@ -23,9 +23,9 @@ def dbt_environment(database_url: str) -> dict[str, str]:
         {
             "DBT_HOST": config.get("host", "localhost"),
             "DBT_PORT": config.get("port", "5432"),
-            "DBT_USER": config.get("user", "bikeshare"),
+            "DBT_USER": config.get("user", "transit"),
             "DBT_PASSWORD": config.get("password", ""),
-            "DBT_DATABASE": config.get("dbname", "bikeshare"),
+            "DBT_DATABASE": config.get("dbname", "transit"),
             "DBT_SSLMODE": config.get("sslmode", "prefer"),
             "DBT_SEND_ANONYMOUS_USAGE_STATS": "false",
             "PGTZ": "UTC",
