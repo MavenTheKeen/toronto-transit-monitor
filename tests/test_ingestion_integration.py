@@ -42,12 +42,13 @@ def test_duplicate_retry_replay_and_later_unchanged_observation(settings):
     assert scalar(settings, "SELECT count(*) FROM normalized.observations") == 2
     run(settings, "later", client=client)
     assert scalar(settings, "SELECT count(*) FROM normalized.observations") == 4
-    assert scalar(settings, "SELECT count(DISTINCT collected_at) FROM normalized.observations") == 2
+    assert scalar(settings, "SELECT count(DISTINCT collected_at) FROM normalized.collections") == 2
     assert scalar(settings, "SELECT count(*) FROM raw.feed_payloads") == 6
     with connect(settings.database_url) as conn:
-        row = conn.execute("SELECT * FROM raw.feed_payloads LIMIT 1").fetchone()
-        assert row["payload_hash"] == payload_hash(row["payload"])
-        assert row["fetched_at"].utcoffset().total_seconds() == 0
+        # Every payload rebuilt from envelope + deduplicated body is the one received.
+        for row in conn.execute("SELECT * FROM raw.feed_payloads_full").fetchall():
+            assert row["payload_hash"] == payload_hash(row["payload"])
+            assert row["fetched_at"].utcoffset().total_seconds() == 0
 
 
 def test_failed_normalized_write_rolls_back_and_replay_recovers(settings):
@@ -61,7 +62,7 @@ def test_failed_normalized_write_rolls_back_and_replay_recovers(settings):
     try:
         with pytest.raises(psycopg.errors.RaiseException):
             run(settings, "failed-write", client=FixtureClient())
-        assert scalar(settings, "SELECT count(*) FROM normalized.station_snapshots") == 0
+        assert scalar(settings, "SELECT count(*) FROM normalized.collections") == 0
         assert scalar(settings, "SELECT count(*) FROM normalized.observations") == 0
         assert scalar(settings, "SELECT count(*) FROM raw.feed_payloads") == 3
         assert scalar(settings, "SELECT status FROM ops.ingestion_runs") == "failed"
@@ -112,8 +113,12 @@ def test_missing_status_is_quality_failure_without_fake_zero(settings):
             return result
 
     run(settings, "missing", client=MissingClient())
-    assert scalar(settings, "SELECT count(*) FROM normalized.station_snapshots") == 2
+    assert scalar(settings, "SELECT count(*) FROM normalized.station_observations") == 2
     assert scalar(settings, "SELECT count(*) FROM normalized.observations") == 1
+    assert scalar(settings, "SELECT count(*) FROM normalized.unobserved_stations") == 1
+    assert (
+        scalar(settings, "SELECT count(*) FROM normalized.station_observations WHERE observed") == 1
+    )
     assert (
         scalar(
             settings,

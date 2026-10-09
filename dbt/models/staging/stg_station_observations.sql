@@ -1,4 +1,5 @@
--- A missing status row is still a metadata snapshot and contributes to coverage.
+-- A station listed in metadata without a status report is still a metadata snapshot
+-- and contributes to coverage; station_observations includes it with observed = false.
 with snapshots as (
     select
         s.collection_id,
@@ -9,25 +10,21 @@ with snapshots as (
         s.capacity,
         r.collected_at,
         s.information_raw_id,
-        coalesce(o.status_raw_id, p.raw_id) as status_raw_id,
-        coalesce(o.status_fetched_at, p.fetched_at) as status_fetched_at,
-        coalesce(o.source_published_at, p.source_published_at) as source_published_at,
-        o.station_reported_at,
-        o.num_bikes_available,
-        o.num_docks_available,
-        o.num_bikes_disabled,
-        o.num_docks_disabled,
-        o.is_installed,
-        o.is_renting,
-        o.is_returning,
-        o.station_id is not null as observed
-    from {{ source('normalized', 'station_snapshots') }} s
+        s.status_raw_id,
+        s.status_fetched_at,
+        s.source_published_at,
+        s.station_reported_at,
+        s.num_bikes_available,
+        s.num_docks_available,
+        s.num_bikes_disabled,
+        s.num_docks_disabled,
+        s.is_installed,
+        s.is_renting,
+        s.is_returning,
+        s.observed
+    from {{ source('normalized', 'station_observations') }} s
     inner join {{ source('ops', 'ingestion_runs') }} r
         on s.collection_id = r.collection_id and r.status = 'succeeded'
-    left join {{ source('normalized', 'observations') }} o
-        on s.collection_id = o.collection_id and s.station_id = o.station_id
-    left join {{ source('raw', 'feed_payloads') }} p
-        on s.collection_id = p.collection_id and p.feed_name = 'station_status'
 ), freshness as (
     select
         *,

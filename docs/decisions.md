@@ -5,10 +5,13 @@
   heuristics. Unknown JSON fields survive in raw storage.
 - **PostgreSQL at every data layer.** JSONB source records in `raw`, Python-validated
   station snapshots and observations in `normalized`, dbt views in `staging` and
-  `analytics`, and operational records in `ops`. A station's metadata is retained
-  per collection, so later name/location/capacity changes do not rewrite history.
-- **Logical collection identity.** `(collection_id, station_id)` is the observation
-  primary key; `(collection_id, feed_name)` is unique for raw feeds. Use an existing
+  `analytics`, and operational records in `ops`. Each distinct station
+  name/location/capacity is stored once as a version, and every collection points to the
+  versions in effect then, so later changes do not rewrite history.
+- **Logical collection identity.** A collection is identified by `collection_id`
+  (stored once, with a small integer `collection_key` that observations use);
+  `(collection_key, station_id)` is the observation primary key and
+  `(collection_id, feed_name)` is unique for raw feeds. Use an existing
   collection ID only to retry that collection. New command invocations default to
   UUIDs. Payload hashes identify content, not observations: identical availability
   collected later remains valid. Feed and station timestamps are not unique keys.
@@ -37,10 +40,22 @@
   collection. Missing individual status rows, stale station reports and stale
   publication times produce visible failed checks; they never become fake zeros.
   Freshness uses a documented 30-minute threshold and 5-minute future tolerance.
-- **A modest local project.** No inferred trips, forecasting, paid services, or
-  production availability guarantee. Analytical views favor inspectable SQL and
-  immediate consistency over premature materialization. Retention/partitioning can
-  follow measured growth; full source snapshots accumulate until explicitly removed.
+- **Store repeated content once (measured, lossless).** After the first day,
+  Bike Share storage was growing about 118 MB/day: 97% of station metadata rows were
+  repeats, and every raw station list was a new copy that differed only in its
+  timestamp. Payload bodies are now content-addressed, station metadata is versioned,
+  and per-collection values are stored per collection. The same data went from 36.4 MB
+  to 8.0 MB, verified by fingerprinting every row and raw payload before and after.
+  `normalized.station_observations` gives readers the original one-row-per-station
+  shape. See [Bike Share storage](bikeshare.md#storage-layout).
+- **Numbered schema migrations.** The original schema files are frozen baselines;
+  every change is a file in `src/transit/migrations`, applied once, in order and in a
+  transaction by `init-db`, and recorded in `ops.schema_migrations`. A migration that
+  changes data checks its own result before dropping anything, and a test runs each
+  one against a database built at the previous schema.
+- **A modest project.** No inferred trips, forecasting, paid services, or availability
+  guarantee. Analytical views favor inspectable SQL and immediate consistency over
+  premature materialization.
 - **Separate dependency environments.** The app, dbt, and Airflow have independent
   pinned dependency sets. The app and dbt use committed uv lockfiles; Airflow uses a
   digest-pinned official image and its official Python constraints. Docker volumes and
@@ -48,8 +63,8 @@
 
 ## Deferred production work
 
-This is a local portfolio service: no external alerts, deployment, secrets manager,
-automatic data retention, backup service, role separation, or public authentication.
-The Compose database role owns its local schemas; dashboard SQL is read-only but
-does not use a separate least-privilege database role. Those would be explicit
-production requirements, not evidence claimed for this project.
+A production configuration exists ([deployment](deploy.md): HTTPS, a read-only
+database login for the public site, daily backups) but is not running publicly yet.
+Still not covered: external alerting, off-server backups, a secrets manager, Bike Share
+data retention, and authentication for the dashboard and Airflow (they are only
+reachable on localhost or through SSH). These are not claimed for this project.

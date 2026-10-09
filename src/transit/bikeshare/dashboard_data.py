@@ -117,16 +117,13 @@ def load_overview(database_url: str) -> dict:
         if latest:
             stations = conn.execute(
                 """
-                SELECT s.station_id, s.name, s.lat, s.lon, s.capacity,
-                       s.information_raw_id, o.collected_at, o.status_fetched_at,
-                       o.source_published_at, o.station_reported_at,
-                       o.num_bikes_available, o.num_docks_available,
-                       o.num_bikes_disabled, o.num_docks_disabled,
-                       o.is_installed, o.is_renting, o.is_returning, o.status_raw_id
-                FROM normalized.station_snapshots s
-                LEFT JOIN normalized.observations o
-                  ON s.collection_id = o.collection_id AND s.station_id = o.station_id
-                WHERE s.collection_id = %s ORDER BY s.name, s.station_id
+                SELECT station_id, name, lat, lon, capacity, information_raw_id,
+                       collected_at, status_fetched_at, source_published_at,
+                       station_reported_at, num_bikes_available, num_docks_available,
+                       num_bikes_disabled, num_docks_disabled,
+                       is_installed, is_renting, is_returning, status_raw_id
+                FROM normalized.station_observations
+                WHERE collection_id = %s ORDER BY name, station_id
                 """,
                 (latest["collection_id"],),
             ).fetchall()
@@ -160,14 +157,12 @@ def load_history(database_url: str, station_id: str, days: int, now=None) -> pd.
     ) as conn:
         rows = conn.execute(
             """
-            SELECT s.collection_id, r.collected_at, o.status_fetched_at,
-                   o.source_published_at, o.station_reported_at,
-                   o.num_bikes_available, o.num_docks_available,
-                   o.is_installed, o.is_renting, o.is_returning, o.status_raw_id
-            FROM normalized.station_snapshots s
+            SELECT s.collection_id, r.collected_at, s.status_fetched_at,
+                   s.source_published_at, s.station_reported_at,
+                   s.num_bikes_available, s.num_docks_available,
+                   s.is_installed, s.is_renting, s.is_returning, s.status_raw_id
+            FROM normalized.station_observations s
             JOIN ops.ingestion_runs r USING (collection_id)
-            LEFT JOIN normalized.observations o
-              ON s.collection_id = o.collection_id AND s.station_id = o.station_id
             WHERE s.station_id = %s AND r.status = 'succeeded'
               AND r.collected_at >= %s AND r.collected_at < %s
             ORDER BY r.collected_at
@@ -273,8 +268,9 @@ def load_analytics(database_url: str, station_id: str, days: int, now=None) -> d
             )) AS observed_slots
             FROM ops.ingestion_runs r
             WHERE r.status = 'succeeded' AND r.collected_at >= %s AND r.collected_at < %s
-              AND EXISTS (SELECT 1 FROM normalized.observations o
-                          WHERE o.collection_id = r.collection_id)
+              AND EXISTS (SELECT 1 FROM normalized.collections c
+                          JOIN normalized.observations o USING (collection_key)
+                          WHERE c.collection_id = r.collection_id)
             """,
             (slot_start, slot_end),
         ).fetchone()["observed_slots"]

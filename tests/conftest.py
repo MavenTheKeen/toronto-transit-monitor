@@ -21,6 +21,7 @@ def settings():
         # An interrupted rollback test can leave its failure-injection trigger behind.
         conn.execute("DROP TRIGGER IF EXISTS reject_test_write ON normalized.observations")
         conn.execute("TRUNCATE ops.ingestion_runs CASCADE")
+        conn.execute("TRUNCATE raw.payload_bodies, normalized.station_versions CASCADE")
         conn.execute("TRUNCATE ops.source_backoff, ops.transformation_runs")
         conn.execute(
             """TRUNCATE normalized.ttc_gtfs_versions, raw.ttc_realtime_snapshots,

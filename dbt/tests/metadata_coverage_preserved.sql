@@ -1,7 +1,7 @@
 -- Both missing and extra staging rows are failures.
 with expected as (
     select s.collection_id, s.station_id
-    from {{ source('normalized', 'station_snapshots') }} s
+    from {{ source('normalized', 'station_observations') }} s
     inner join {{ source('ops', 'ingestion_runs') }} r using (collection_id)
     where r.status = 'succeeded'
 ), actual as (

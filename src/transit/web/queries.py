@@ -435,11 +435,11 @@ def nearest_bikes(conn, lat: float, lon: float, now: datetime, limit: int = 2) -
         """WITH latest AS (
              SELECT collection_id, collected_at FROM ops.ingestion_runs
              WHERE status = 'succeeded' ORDER BY collected_at DESC LIMIT 1)
-           SELECT s.station_id, s.name, s.lat, s.lon, o.num_bikes_available,
-                  o.num_docks_available, o.is_renting, o.station_reported_at, l.collected_at
+           SELECT s.station_id, s.name, s.lat, s.lon, s.num_bikes_available,
+                  s.num_docks_available, s.is_renting, s.station_reported_at, l.collected_at
            FROM latest l
-           JOIN normalized.station_snapshots s USING (collection_id)
-           JOIN normalized.observations o USING (collection_id, station_id)
+           JOIN normalized.station_observations s USING (collection_id)
+           WHERE s.observed
            ORDER BY (s.lat - %(lat)s) ^ 2 + ((s.lon - %(lon)s) * cos(radians(%(lat)s))) ^ 2
            LIMIT %(limit)s""",
         {"lat": lat, "lon": lon, "limit": limit},
@@ -499,12 +499,12 @@ def bike_docks(conn, now: datetime) -> dict:
         """WITH latest AS (
              SELECT collection_id, collected_at FROM ops.ingestion_runs
              WHERE status = 'succeeded' ORDER BY collected_at DESC LIMIT 1)
-           SELECT s.station_id, s.name, s.lat, s.lon, s.capacity, o.num_bikes_available,
-                  o.num_docks_available, o.is_installed, o.is_renting, o.is_returning,
-                  o.station_reported_at, l.collected_at
+           SELECT s.station_id, s.name, s.lat, s.lon, s.capacity, s.num_bikes_available,
+                  s.num_docks_available, s.is_installed, s.is_renting, s.is_returning,
+                  s.station_reported_at, l.collected_at
            FROM latest l
-           JOIN normalized.station_snapshots s USING (collection_id)
-           JOIN normalized.observations o USING (collection_id, station_id)
+           JOIN normalized.station_observations s USING (collection_id)
+           WHERE s.observed
            ORDER BY s.station_id""",
     ).fetchall()
     collected_at = rows[0]["collected_at"] if rows else None

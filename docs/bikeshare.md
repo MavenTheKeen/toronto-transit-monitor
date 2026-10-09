@@ -17,14 +17,38 @@ See [source verification and licensing nuances](source.md).
 ## Data flow
 
 1. **Raw**: each GBFS response (discovery, station information, station status) is
-   stored as received in `raw.feed_payloads` with its hash, before any parsing.
+   stored before any parsing, with the hash of the payload as received.
 2. **Validate and normalize**: in a separate transaction, payloads are parsed and
-   validated into `normalized.station_snapshots` and `normalized.observations`. A
-   malformed or empty feed fails the collection rather than storing an empty dataset.
+   validated into the normalized tables below. A malformed or empty feed fails the
+   collection rather than storing an empty dataset.
 3. **Transform**: dbt builds staging and analytics views (hourly station metrics,
    empty/full rates) with tests; results are recorded in `ops.transformation_runs`.
 4. **Ops**: every attempt is a row in `ops.ingestion_runs` / `ops.ingestion_attempts`,
    and data-quality checks are recorded alongside.
+
+## Storage layout
+
+Most of each collection repeats the previous one, so repeated content is stored once
+(migration `0001_bikeshare_compact_storage`). Nothing is discarded.
+
+| Table | One row per | Holds |
+| --- | --- | --- |
+| `raw.feed_payloads` | fetch | Envelope (`last_updated`, `ttl`, `version`), fetch times, hash of the full payload, `body_hash` |
+| `raw.payload_bodies` | distinct `data` content | The payload's `data` member, keyed by the SHA-256 of its canonical jsonb text |
+| `normalized.collections` | collection | Collection time, status fetch and publication times, raw lineage |
+| `normalized.station_versions` | distinct station name/location/capacity | Station metadata |
+| `normalized.observations` | reported station per collection | Counts, flags, report time, station version |
+| `normalized.unobserved_stations` | station listed without a status report | Kept so coverage stays exact |
+
+Two views put it back together: `raw.feed_payloads_full` returns every payload exactly
+as received (`payload_hash` still verifies it), and `normalized.station_observations`
+returns one row per station listed in each collection's metadata, with its status when
+reported (`observed`). dbt, the dashboard and the site read the view.
+
+Measured on the first day's data (34 collections): 36.4 MB before, 8.0 MB after.
+Observation rows went from 158 to 64 bytes. Station information bodies are shared by
+most fetches; they change only when a field such as `is_valet_station` toggles for event
+valet service (6 distinct bodies in 35 fetches). Status bodies are new every time.
 
 ## Collect, retry and replay
 

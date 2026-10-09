@@ -5,14 +5,30 @@ sources:
     schema: normalized
     description: Validated records committed atomically by the Python collector.
     tables:
-      - name: station_snapshots
-        description: One metadata record per collection and station, even if status is missing.
+      - name: station_observations
+        description: >-
+          View: one row per station listed in a collection's metadata, with its status
+          report if there was one (observed). Rebuilt from the compact tables below.
         columns:
           - name: collection_id
             data_tests:
               - not_null
           - name: station_id
             data_tests:
+              - not_null
+          - name: observed
+            data_tests:
+              - not_null
+      - name: collections
+        description: Per-collection fetch times and raw lineage, stored once per collection.
+        columns:
+          - name: collection_key
+            data_tests:
+              - unique
+              - not_null
+          - name: collection_id
+            data_tests:
+              - unique
               - not_null
           - name: information_raw_id
             data_tests:
@@ -21,9 +37,6 @@ sources:
                   arguments:
                     to: source('raw', 'feed_payloads')
                     field: raw_id
-      - name: observations
-        description: Actual station availability reports; no synthetic observations.
-        columns:
           - name: status_raw_id
             data_tests:
               - not_null
@@ -31,6 +44,15 @@ sources:
                   arguments:
                     to: source('raw', 'feed_payloads')
                     field: raw_id
+      - name: station_versions
+        description: Each distinct name, location and capacity a station has had.
+        columns:
+          - name: station_version_id
+            data_tests:
+              - unique
+              - not_null
+      - name: observations
+        description: Actual station availability reports; no synthetic observations.
       - name: ttc_gtfs_versions
         description: One row per loaded TTC static GTFS zip (subway subset), keyed by its SHA-256.
         columns:
@@ -76,7 +98,9 @@ sources:
     schema: raw
     tables:
       - name: feed_payloads
-        description: Source JSONB and fetch metadata retained for replay and lineage.
+        description: >-
+          One row per fetch: envelope JSON and fetch metadata, with the payload's data
+          member stored once per distinct content in payload_bodies (body_hash).
         columns:
           - name: raw_id
             data_tests:
