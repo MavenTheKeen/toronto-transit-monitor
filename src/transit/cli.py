@@ -7,8 +7,8 @@ import sys
 
 from transit.bikeshare.ingestion import CollectionBusy, run
 from transit.bikeshare.parsing import FeedValidationError, discover, parse_information, parse_status
-from transit.config import DISCOVERY_URL, Settings
-from transit.db import connect, init_db
+from transit.config import DISCOVERY_URL, WEB_DB_ROLE, Settings
+from transit.db import connect, ensure_readonly_role, init_db
 from transit.http import FeedClient, FetchError
 from transit.transform import run_transform
 from transit.ttc import collector as ttc_collector
@@ -73,6 +73,12 @@ def main():
             elif args.command == "init-db":
                 init_db(settings.database_url)
                 result = {"schema": "ready"}
+                # Deployments give the public site its own read-only login.
+                if os.environ.get("WEB_DB_PASSWORD"):
+                    ensure_readonly_role(
+                        settings.database_url, WEB_DB_ROLE, os.environ["WEB_DB_PASSWORD"]
+                    )
+                    result["readonly_role"] = WEB_DB_ROLE
             elif args.command == "transform":
                 result = run_transform(settings.database_url, args.dbt_executable, args.project_dir)
             else:

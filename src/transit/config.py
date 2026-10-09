@@ -6,6 +6,8 @@ from dataclasses import dataclass
 DISCOVERY_URL = "https://toronto.publicbikesystem.net/customer/gbfs/v3.0/gbfs.json"
 STALE_SECONDS = 1800
 FUTURE_TOLERANCE_SECONDS = 300
+# Read-only login for the public site, created by init-db when WEB_DB_PASSWORD is set.
+WEB_DB_ROLE = "transit_web"
 
 
 @dataclass(frozen=True)
