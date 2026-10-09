@@ -10,7 +10,7 @@ from tests.ttc_helpers import T0, alert_feed, static_zip, trip_feed
 from transit.bikeshare.ingestion import run
 from transit.db import connect
 from transit.ttc import static_gtfs, store
-from transit.web import queries
+from transit.web import pipeline, queries
 from transit.web.app import RateLimiter, TTLCache, create_app
 
 
@@ -327,6 +327,29 @@ def test_detected_status_only_when_ttc_reports_nothing():
     assert one["detected"]["label"] == "Possible delay, not confirmed by TTC"
     assert one["detected"]["source"] == "detected"
     assert two["status"] == "delays" and two["detected"] is None
+
+
+def test_pipeline_verdict_is_by_time_since_last_success():
+    limit = timedelta(minutes=2)
+    assert pipeline.verdict(T0 - timedelta(seconds=30), limit, T0) == "ok"
+    assert pipeline.verdict(T0 - timedelta(minutes=5), limit, T0) == "delayed"
+    assert pipeline.verdict(T0 - timedelta(minutes=9), limit, T0) == "failing"
+    assert pipeline.verdict(None, limit, T0) == "failing"
+
+
+@pytest.mark.integration
+def test_pipeline_endpoint_reports_each_part(client):
+    body = client.get("/api/pipeline").json()
+    # The fixture stores snapshots directly, without the poller, so no poll has succeeded.
+    assert [f["feed"] for f in body["ttc"]["feeds"]] == list(pipeline.FEED_LABELS)
+    assert {f["status"] for f in body["ttc"]["feeds"]} == {"failing"}
+    assert body["overall"] == "failing"
+    assert body["bikeshare"]["succeeded_24h"] == 1
+    assert {c["check_name"] for c in body["bikeshare"]["quality_checks"]} >= {
+        "station_status_coverage"
+    }
+    assert body["dbt"]["status"] == "failing" and body["dbt"]["latest"] is None
+    assert body["data"]["schema_version"].startswith("0001")
 
 
 @pytest.mark.integration

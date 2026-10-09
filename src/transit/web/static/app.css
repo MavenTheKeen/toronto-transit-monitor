@@ -280,6 +280,16 @@ table.hours { width: 100%; border-collapse: collapse; font-variant-numeric: tabu
 .map-panel h2 { margin: 0 0 6px; font-size: 1.1rem; }
 .map-panel { min-height: 64px; }
 
+/* Pipeline status */
+.checks { list-style: none; padding: 0; margin: 8px 0 0; }
+.checks li { display: grid; grid-template-columns: 1.2em 1fr; gap: 0 8px; padding: 5px 0; border-top: 1px solid var(--border); }
+.checks .detail { display: block; }
+.checks .pass { color: var(--ok); font-weight: 800; }
+.checks .fail { color: var(--bad); font-weight: 800; }
+.facts { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px 16px; margin: 8px 0; }
+.facts dt { color: var(--muted); }
+.facts dd { margin: 0; font-weight: 600; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+
 /* Footer */
 .updated { color: var(--muted); font-size: 0.85rem; margin-top: 24px; }
 .updated.warn { color: var(--warn); }

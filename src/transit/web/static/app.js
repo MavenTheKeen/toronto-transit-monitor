@@ -854,6 +854,137 @@ async function renderMap(focusKey) {
   ];
 }
 
+// Pipeline status: health of each collector and the dbt build, from the ops tables.
+const HEALTH = {
+  ok: ["normal", "Healthy"],
+  delayed: ["delays", "Delayed"],
+  failing: ["no_service", "Failing"],
+};
+const CHECK_LABELS = {
+  feed_freshness: "Feeds published within the last 30 minutes",
+  required_fields_and_unique_stations: "Required fields present, no duplicate stations",
+  station_report_freshness: "Every station reported within the last 30 minutes",
+  station_status_coverage: "Every listed station has a status report",
+};
+const numberFmt = new Intl.NumberFormat("en-CA");
+
+function healthPill(status) {
+  const [css, label] = HEALTH[status] || HEALTH.failing;
+  return statusPill(css, label);
+}
+
+function ageText(seconds) {
+  if (seconds === null || seconds === undefined) return "never";
+  if (seconds < 90) return `${seconds} s ago`;
+  if (seconds < 5400) return `${Math.round(seconds / 60)} min ago`;
+  return `${Math.round(seconds / 3600)} h ago`;
+}
+
+function healthCard(title, status, ...body) {
+  return el("section", { class: "card" }, el("h3", { class: "with-link" }, title, healthPill(status)), body);
+}
+
+function checkDetail(check) {
+  const d = check.details || {};
+  if (check.check_name === "station_report_freshness") {
+    return `${numberFmt.format(d.stale_or_future_reports)} of ${numberFmt.format(d.observed_stations)} stale`;
+  }
+  if (check.check_name === "station_status_coverage") {
+    return `${numberFmt.format(d.observed_stations)} of ${numberFmt.format(d.metadata_stations)} reported`;
+  }
+  return null;
+}
+
+async function renderPipeline() {
+  const data = await api("/api/pipeline");
+  const { ttc, bikeshare: bikes, dbt, data: volume } = data;
+  const drops = ttc.dropouts_today;
+  const latest = dbt.latest;
+  const dateOf = (iso) => (iso ? dayFmt.format(new Date(iso)) : "–");
+  return [
+    el("h1", { class: "with-link" }, "Pipeline status", healthPill(data.overall)),
+    el(
+      "p",
+      { class: "muted" },
+      "Health of the data pipelines behind this site, read from the records each step writes as it runs. ",
+      "Healthy means the last success is recent; delayed or failing means data on this site may be out of date.",
+    ),
+    el("h2", {}, "TTC realtime feeds"),
+    el("p", { class: "muted small" }, "Polled every 30 seconds."),
+    ttc.feeds.map((f) =>
+      healthCard(
+        f.label,
+        f.status,
+        el("p", {}, `Last update ${ageText(f.age_seconds)}`),
+        el(
+          "p",
+          { class: "muted small" },
+          `Last hour: ${numberFmt.format(f.last_hour.polls)} polls, ${f.last_hour.failed} failed · `,
+          `${numberFmt.format(f.last_hour.rejected)} records rejected, ${numberFmt.format(f.last_hour.flagged)} flagged by validation`,
+        ),
+      ),
+    ),
+    drops.snapshots
+      ? el(
+          "p",
+          {},
+          `Feed dropouts today: ${numberFmt.format(drops.dropouts)} of ${numberFmt.format(drops.snapshots)} train snapshots (${drops.pct}%) listed far fewer trains than the minutes before and were skipped, so they never blank this site.`,
+        )
+      : null,
+    el("h2", {}, "Bike Share"),
+    healthCard(
+      "Dock availability",
+      bikes.status,
+      el("p", {}, `Last collection ${ageText(bikes.age_seconds)} · runs every 15 minutes`),
+      el(
+        "p",
+        { class: "muted small" },
+        `${numberFmt.format(bikes.succeeded_24h)} collections in the last 24 hours (at most ${bikes.expected_24h}), ${bikes.failed_attempts_24h} failed attempts`,
+      ),
+      el(
+        "ul",
+        { class: "checks" },
+        bikes.quality_checks.map((c) =>
+          el(
+            "li",
+            {},
+            el("span", { class: c.passed ? "pass" : "fail", "aria-hidden": "true" }, c.passed ? "✓" : "✕"),
+            el(
+              "span",
+              {},
+              CHECK_LABELS[c.check_name] || c.check_name,
+              el("span", { class: "sr-only" }, c.passed ? " (passed)" : " (failed)"),
+              checkDetail(c) ? el("span", { class: "detail muted small" }, checkDetail(c)) : null,
+            ),
+          ),
+        ),
+      ),
+    ),
+    el("h2", {}, "Transformations"),
+    healthCard(
+      "dbt models and tests",
+      dbt.status,
+      el("p", {}, `Last successful build ${ageText(dbt.age_seconds)}`),
+      latest
+        ? el("p", { class: "muted small" }, `Latest build: ${latest.passed} passed, ${plural(latest.warned, "warning", "warnings")}, ${latest.failed} failed`)
+        : null,
+    ),
+    el("h2", {}, "Data collected"),
+    el(
+      "dl",
+      { class: "card facts" },
+      el("dt", {}, "Subway history since"), el("dd", {}, dateOf(volume.ttc_since)),
+      el("dt", {}, "Train visits recorded"), el("dd", {}, numberFmt.format(volume.rows.ttc_train_visits ?? 0)),
+      el("dt", {}, "Gaps between trains measured"), el("dd", {}, numberFmt.format(volume.rows.ttc_headways ?? 0)),
+      el("dt", {}, "Bike Share history since"), el("dd", {}, dateOf(volume.bikeshare_since)),
+      el("dt", {}, "Dock readings recorded"), el("dd", {}, numberFmt.format(volume.rows.bikeshare_observations ?? 0)),
+      el("dt", {}, "Database size"), el("dd", {}, `${(volume.database_bytes / 1e6).toFixed(0)} MB`),
+      el("dt", {}, "Schema version"), el("dd", {}, (volume.schema_version || "–").replaceAll("_", " ")),
+    ),
+    el("p", { class: "muted small" }, "Row counts are PostgreSQL's planner estimates, refreshed as tables are analyzed."),
+  ];
+}
+
 // A periodic refresh must not throw away what the visitor is doing: typed search text,
 // focus, open panels and scroll position are carried over to the new content.
 function captureState() {
@@ -911,6 +1042,7 @@ async function route({ refresh = false } = {}) {
     else if (kind === "station" && id) content = await renderStation(id);
     else if (kind === "reliability") content = await renderReliability();
     else if (kind === "map") content = await renderMap(id);
+    else if (kind === "pipeline") content = await renderPipeline();
     else content = await renderHome();
     if (seq !== renderSeq) return; // A newer navigation or refresh finished first.
     const state = refresh ? captureState() : null;

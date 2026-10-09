@@ -19,7 +19,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from transit.db import connect
-from transit.web import queries
+from transit.web import pipeline, queries
 
 CACHE_SECONDS = 15
 RATE_LIMIT = int(os.environ.get("WEB_RATE_LIMIT_PER_MINUTE", "120"))
@@ -277,6 +277,10 @@ def create_app(database_url: str | None = None, clock=lambda: datetime.now(UTC))
             }
 
         return cached("map", build)
+
+    @app.get("/api/pipeline")
+    def pipeline_health():
+        return cached("pipeline", lambda conn, now: pipeline.pipeline_status(conn, now))
 
     @app.get("/api/reliability")
     def reliability():
