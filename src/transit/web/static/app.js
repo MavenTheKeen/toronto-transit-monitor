@@ -1045,14 +1045,14 @@ async function renderPipeline() {
     data.official_delays
       ? [
           el("h2", {}, "TTC's official delay log"),
+          data.official_delays.log_reaches
+            ? el("p", {}, "Latest incident in TTC's published log: ", el("strong", {}, dayFmt.format(new Date(data.official_delays.log_reaches))))
+            : null,
           el(
             "p",
-            {},
-            data.official_delays.log_reaches
-              ? `TTC's published log currently covers incidents up to ${dayFmt.format(new Date(data.official_delays.log_reaches))}. `
-              : "",
-            `Last checked ${ageText(Math.round((Date.now() - new Date(data.official_delays.finished_at)) / 1000))} (${data.official_delays.status}). `,
-            "The city publishes each month a few weeks after it ends; this site's detected gaps are compared with it once the months overlap.",
+            { class: "muted small" },
+            `Checked ${ageText(Math.round((Date.now() - new Date(data.official_delays.finished_at)) / 1000))} (${data.official_delays.status}). `,
+            "The city publishes each month a few weeks after it ends; this site's observed gaps are compared with it once the months overlap.",
           ),
         ]
       : null,
