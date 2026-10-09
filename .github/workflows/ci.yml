@@ -79,10 +79,12 @@ jobs:
           docker compose run --rm init-db
       - name: Build dbt views on an empty clean database
         run: docker compose run --rm dbt
-      - name: Check dashboard and Airflow startup (DAG starts paused; no live API)
+      - name: Check dashboard, Airflow and web startup (DAG starts paused; no live API)
         run: |
-          docker compose --profile airflow up -d --wait --wait-timeout 240 dashboard airflow
+          docker compose --profile airflow up -d --wait --wait-timeout 240 dashboard airflow web
           curl --fail http://localhost:8501/_stcore/health
+          curl --fail http://localhost:8000/health
+          curl --fail --silent http://localhost:8000/ | grep -q "Toronto Transit Commission"
       - name: Logs on failure
         if: failure()
         run: docker compose --profile airflow logs --no-color --tail 150
