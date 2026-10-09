@@ -134,13 +134,15 @@ With Python/uv installed, and Compose PostgreSQL running:
 uv sync --locked
 uv sync --project dbt --locked
 docker compose exec postgres createdb -U bikeshare bikeshare_test
-$env:TEST_DATABASE_URL='postgresql://bikeshare:YOUR_ENV_PASSWORD@localhost:5432/bikeshare_test'
+$env:TEST_DATABASE_URL='postgresql://bikeshare:YOUR_ENV_PASSWORD@127.0.0.1:5432/bikeshare_test'
 $env:DBT_EXECUTABLE="$PWD/dbt/.venv/Scripts/dbt.exe"
 uv run --locked pytest -q
 uv run --locked ruff check src tests dashboard scripts airflow
 ```
 
-Create the test database only once. On Linux/macOS use `export NAME=value` and
+Use `127.0.0.1`, not `localhost`: Compose publishes PostgreSQL on IPv4 loopback
+only, and on Windows `localhost` tries IPv6 first, which makes every connection
+stall. Create the test database only once. On Linux/macOS use `export NAME=value` and
 `DBT_EXECUTABLE="$PWD/dbt/.venv/bin/dbt"`. Without `TEST_DATABASE_URL`, PostgreSQL
 tests skip; without `DBT_EXECUTABLE`, the dbt integration build skips. For offline
 unit/UI tests explicitly: `uv run --locked pytest -m 'not integration' -q`.
@@ -159,7 +161,7 @@ docker compose run --rm collector smoke
 Native application commands use `DATABASE_URL` (the app does not auto-load `.env`):
 
 ```powershell
-$env:DATABASE_URL='postgresql://bikeshare:YOUR_ENV_PASSWORD@localhost:5432/bikeshare'
+$env:DATABASE_URL='postgresql://bikeshare:YOUR_ENV_PASSWORD@127.0.0.1:5432/bikeshare'
 uv run --locked bikeshare init-db
 uv run --locked bikeshare collect
 uv run --locked bikeshare transform --dbt-executable "$PWD/dbt/.venv/Scripts/dbt.exe"

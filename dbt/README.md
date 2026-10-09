@@ -13,7 +13,7 @@ uv run --project dbt --locked dbt build --project-dir dbt --profiles-dir dbt
 ```
 
 Connection variables are `DBT_HOST`, `DBT_PORT`, `DBT_USER`, `DBT_PASSWORD`, and
-`DBT_DATABASE`. Defaults target localhost:5432, user/database `bikeshare`, and an
+`DBT_DATABASE`. Defaults target 127.0.0.1:5432, user/database `bikeshare`, and an
 empty password; set the password to match your local database. The
 [official PostgreSQL profile documentation](https://docs.getdbt.com/docs/core/connect-data-platform/postgres-setup)
 describes the profile fields. Always use a separate disposable database in CI.

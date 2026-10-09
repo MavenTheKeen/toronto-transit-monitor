@@ -3,7 +3,7 @@ bikeshare:
   outputs:
     local:
       type: postgres
-      host: "{{ env_var('DBT_HOST', 'localhost') }}"
+      host: "{{ env_var('DBT_HOST', '127.0.0.1') }}"
       port: "{{ env_var('DBT_PORT', '5432') | int }}"
       user: "{{ env_var('DBT_USER', 'bikeshare') }}"
       password: "{{ env_var('DBT_PASSWORD', '') }}"
