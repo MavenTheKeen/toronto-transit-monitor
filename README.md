@@ -140,7 +140,7 @@ and the source quirks found in the live feed. Data: Toronto Transit Commission.
 ## Public subway site
 
 A FastAPI service exposes read-only JSON endpoints and a mobile-first page: service
-status per line, active alerts and planned closures, a line diagram with estimated
+status per line (reported by TTC, plus our own clearly labelled detected delays), active alerts and planned closures, a line diagram with estimated
 train positions and unusually long gaps, and station pages with next arrivals,
 elevator/escalator outages and the nearest Bike Share dock.
 
@@ -148,7 +148,10 @@ elevator/escalator outages and the nearest Bike Share dock.
 docker compose up -d web
 ```
 
-Open **<http://localhost:8000>**. See [public site and API](docs/site.md).
+Open **<http://localhost:8000>**. See [public site and API](docs/site.md). A Reliability
+page shows the longest gaps between trains, headway reliability by hour, and
+elevator/escalator outage durations from dbt models; see
+[reliability analytics](docs/reliability.md).
 
 ## Tests and native development
 

@@ -8,29 +8,33 @@ docker compose up -d web
 ```
 
 Open <http://localhost:8000>. Pages use hash routes: `#/` (service status), `#/line/1`
-(line view), `#/station/bloor-yonge` (station).
+(line view), `#/station/bloor-yonge` (station), `#/reliability` (reliability).
 
-| Home | Line | Station |
-| --- | --- | --- |
-| ![Service status](screenshots/site-home.png) | ![Line 1 diagram](screenshots/site-line1.png) | ![Bloor-Yonge](screenshots/site-station.png) |
+| Home | Line | Station | Reliability |
+| --- | --- | --- | --- |
+| ![Service status](screenshots/site-home.png) | ![Line 1 diagram](screenshots/site-line1.png) | ![Bloor-Yonge](screenshots/site-station.png) | ![Reliability](screenshots/site-reliability.png) |
 
-Screenshots were captured from real data on 2026-10-09 at about 10:25 Toronto time.
+Screenshots were captured from real data on 2026-10-09 (reliability at 10:47 Toronto
+time, about 80 minutes after collection started).
 
 ## Endpoints
 
 | Path | Returns |
 | --- | --- |
-| `/api/status` | One status row per line: `normal`, `delays`, `reduced_service`, `modified_service`, `no_service`, or `unknown` when alerts are stale. `source` is `reported` (from TTC alerts). |
+| `/api/status` | One status row per line: `normal`, `delays`, `reduced_service`, `modified_service`, `no_service`, or `unknown` when alerts are stale. `source` is `reported` (from TTC alerts). `detected` holds our own possible-delay inference, only when TTC reports nothing. |
 | `/api/alerts` | Active service alerts, upcoming planned closures and advance notices, and active elevator/escalator outages. |
 | `/api/lines` | Lines with colours, directions and status, plus every station for search. |
 | `/api/lines/{id}` | Stations in order, estimated train positions, gaps between consecutive trains, and the scheduled headway now. |
 | `/api/stations/{key}` | Next arrivals per platform, alerts naming the station's platforms, line status, and the nearest Bike Share docks. |
+| `/api/reliability` | Longest gaps today, regular-headway share by hour (today and 7 days), and elevator/escalator outages, from the dbt models. `available: false` until the first build. |
 | `/health` | `ok`, `degraded` (predictions older than 2 minutes), `no_data` (no schedule loaded), or HTTP 503 if PostgreSQL is unreachable. |
 
 Every response includes `generated_at` and the attribution. Freshness objects
 (`as_of`, `stale`) accompany predictions, alerts and Bike Share data.
 
 ## How positions, gaps and status are derived
+
+Reliability metrics and detected delays are defined in [reliability analytics](reliability.md).
 
 - **Train position.** The subway feed has no vehicle positions. TTC often predicts a
   train's first listed platform at the current time even while it is between stations,

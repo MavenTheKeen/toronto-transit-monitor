@@ -50,13 +50,20 @@ platforms of each train. Two findings from the live feed shape the model:
   reference. A prediction for the same train and platform within 10 minutes of an
   existing visit updates that visit; a train passes a given platform at most once per
   round trip.
-- **Arrival is inferred.** A visit is marked `passed_at` when a later snapshot still
-  contains the train but no longer lists that platform. Its last `predicted_arrival` is
-  the best available estimate of when the train was there. If the platform is listed
-  again later, the mark is withdrawn.
+- **Arrival is inferred.** A visit is marked `passed_at` at the first snapshot that no
+  longer lists that platform, provided the train was due there within 2 minutes when
+  last listed (and was listed in the last 10 minutes). Its last `predicted_arrival` is
+  the best available estimate of when the train was there. This holds whether or not
+  the train is still in the feed: trains leave the feed at terminals and when their
+  label changes. A platform dropped well before its predicted time is a withdrawn
+  prediction (short turn, reroute), not an arrival. If the platform is listed again
+  later, the mark is withdrawn.
 
 Terminal platforms need care in analysis: trains dwell and change ends there, and the
-vehicle label can change when they do.
+vehicle label can change when they do. Near Wilson Yard, where trains enter and leave
+service, one train is occasionally reported under two labels for a few minutes, which
+shows up as two arrivals under a minute apart; these are flagged `implausible` and
+excluded from reliability metrics.
 
 ## Validation
 
