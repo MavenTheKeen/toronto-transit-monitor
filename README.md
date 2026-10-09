@@ -214,8 +214,3 @@ and the [demo walkthrough](docs/demo.md).
   `.env`; internal Compose ports stay unchanged.
 - **Unhealthy Airflow:** inspect logs then `docker compose restart airflow`.
   Standalone does not supervise crashed child components for production recovery.
-
-
-Security review: see [scope, verified fixes and remaining limitations](docs/security-review.md).
-This is a local development deployment; publishing the source does not require exposing
-PostgreSQL, Streamlit or Airflow to the public internet.
