@@ -12,6 +12,7 @@ from collections import deque
 from datetime import UTC, datetime
 from importlib.resources import files
 
+import psycopg
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -99,7 +100,20 @@ def create_app(database_url: str | None = None, clock=lambda: datetime.now(UTC))
         state = queries.feed_state(conn)
         alerts = queries.current_alerts(conn, now)
         alerts_fresh = queries.freshness(state, "alerts_subway", now, queries.ALERTS_STALE)
-        return static, state, alerts, queries.line_statuses(static["lines"], alerts, alerts_fresh)
+        detected = {}
+        if not queries.freshness(state, "trips_subway", now, queries.PREDICTIONS_STALE)["stale"]:
+            headways = {
+                line["id"]: queries.scheduled_headways(conn, static["version"], line["id"], now)
+                for line in static["lines"]
+            }
+            detected = queries.detected_delays(
+                queries.platform_waits(conn, static["version"], now),
+                headways,
+                queries.collection_gaps(conn, now),
+                now,
+            )
+        statuses = queries.line_statuses(static["lines"], alerts, alerts_fresh, detected)
+        return static, state, alerts, statuses
 
     def cached(key, build):
         def compute():
@@ -241,6 +255,17 @@ def create_app(database_url: str | None = None, clock=lambda: datetime.now(UTC))
             }
 
         return cached(f"station:{key}", build)
+
+    @app.get("/api/reliability")
+    def reliability():
+        def build(conn, now):
+            try:
+                return {"available": True, **queries.reliability(conn, now)}
+            except psycopg.errors.UndefinedTable:
+                # Reliability tables appear after the first dbt build.
+                return {"available": False}
+
+        return cached("reliability", build)
 
     @app.get("/", include_in_schema=False)
     def index():

@@ -125,3 +125,20 @@ footer.site { color: var(--muted); font-size: 0.85rem; padding-bottom: 32px; }
 @media (prefers-reduced-motion: no-preference) {
   .train { transition: top 1s linear; }
 }
+
+.navlink { font-weight: 600; margin-left: 4px; }
+.detected { margin-top: 6px; padding-top: 6px; border-top: 1px dashed var(--border); }
+.detected p { margin: 4px 0; }
+.gaps { margin: 0; padding-left: 1.4em; }
+.gaps li { margin: 6px 0; }
+.plain { list-style: none; padding-left: 14px; }
+.plain li { padding: 4px 0; }
+table.hours { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.hours th, .hours td { text-align: left; padding: 4px 6px 4px 0; border-bottom: 1px solid var(--border); }
+.hours thead th { font-size: 0.8rem; color: var(--muted); font-weight: 600; }
+.meter {
+  position: relative; display: inline-block; width: 100%; max-width: 120px; height: 18px;
+  background: var(--border); border-radius: 4px; overflow: hidden; vertical-align: middle;
+}
+.meter .fill { position: absolute; top: 0; bottom: 0; left: 0; background: var(--ok); opacity: 0.35; }
+.meter .value { position: relative; padding-left: 4px; font-size: 0.8rem; font-weight: 700; }

@@ -321,8 +321,11 @@ def _iso(epoch):
     return datetime.fromtimestamp(epoch, TORONTO).isoformat() if epoch else None
 
 
-def line_statuses(line_list: list[dict], alerts: list[dict], alerts_fresh: dict) -> list[dict]:
-    """Reported status per line: the most severe active TTC service alert."""
+def line_statuses(
+    line_list: list[dict], alerts: list[dict], alerts_fresh: dict, detected: dict | None = None
+) -> list[dict]:
+    """Reported status per line (the most severe active TTC service alert) and, only when
+    TTC reports nothing, our detected possible delay."""
     statuses = []
     for line in line_list:
         active = [
@@ -347,6 +350,16 @@ def line_statuses(line_list: list[dict], alerts: list[dict], alerts_fresh: dict)
                 "source": "reported",
                 "alerts": [a["id"] for a in active],
                 "summary": ranked[0]["header"] if ranked else None,
+                "detected": (
+                    {
+                        "status": "possible_delay",
+                        "label": "Possible delay, not confirmed by TTC",
+                        "source": "detected",
+                        "incidents": (detected or {})[line["id"]],
+                    }
+                    if status == "normal" and (detected or {}).get(line["id"])
+                    else None
+                ),
             }
         )
     return statuses
@@ -459,3 +472,190 @@ def all_stations(conn, version: str) -> list[dict]:
             (version,),
         )
     ]
+
+
+DETECTION_WINDOW = timedelta(minutes=90)
+COLLECTION_GAP = timedelta(minutes=2)
+COMPASS = {"Northbound", "Southbound", "Eastbound", "Westbound"}
+
+
+def platform_waits(conn, version: str, now: datetime) -> list[dict]:
+    """Last observed arrival and next predicted arrival at every non-terminal platform."""
+    return conn.execute(
+        """WITH platforms AS (
+             SELECT ls.route_id, ls.direction_id, ls.stop_order, ls.stop_id, ls.towards,
+                    s.station_name, s.station_key, s.platform,
+                    max(ls.stop_order) OVER (PARTITION BY ls.route_id, ls.direction_id)
+                      AS last_order
+             FROM normalized.ttc_line_stops ls
+             JOIN normalized.ttc_stops s USING (feed_version, stop_id)
+             WHERE ls.feed_version = %(v)s),
+           last_arrival AS (
+             SELECT stop_id, max(predicted_arrival) AS at
+             FROM normalized.ttc_train_stop_events
+             WHERE passed_at IS NOT NULL AND predicted_arrival > %(since)s
+               AND predicted_arrival <= %(now)s
+             GROUP BY stop_id),
+           next_arrival AS (
+             SELECT stop_id, min(predicted_arrival) AS at
+             FROM normalized.ttc_current_predictions
+             WHERE predicted_arrival >= %(now)s - interval '20 seconds'
+             GROUP BY stop_id)
+           SELECT p.*, la.at AS last_arrival, na.at AS next_arrival
+           FROM platforms p
+           LEFT JOIN last_arrival la USING (stop_id)
+           LEFT JOIN next_arrival na USING (stop_id)
+           WHERE p.stop_order > 1 AND p.stop_order < p.last_order
+           ORDER BY p.route_id, p.direction_id, p.stop_order""",
+        {"v": version, "since": now - DETECTION_WINDOW, "now": now},
+    ).fetchall()
+
+
+def collection_gaps(conn, now: datetime) -> list[tuple]:
+    """Intervals in the detection window without a new trip-update snapshot."""
+    rows = conn.execute(
+        """SELECT DISTINCT feed_timestamp FROM ops.ttc_poll_runs
+           WHERE feed = 'trips_subway' AND status = 'stored' AND feed_timestamp > %s
+           ORDER BY feed_timestamp""",
+        (now - DETECTION_WINDOW - COLLECTION_GAP,),
+    ).fetchall()
+    times = [now - DETECTION_WINDOW - COLLECTION_GAP, *(r["feed_timestamp"] for r in rows), now]
+    return [(a, b) for a, b in zip(times, times[1:], strict=False) if b - a > COLLECTION_GAP]
+
+
+def _incident(run: list[dict]) -> dict:
+    worst = max(run, key=lambda r: r["waited"])
+    where = (
+        f"No {worst['platform'].lower()} train"
+        if worst["platform"] in COMPASS
+        else f"No train towards {worst['towards']}"
+    )
+    return {
+        "direction_id": worst["direction_id"],
+        "towards": worst["towards"],
+        "station": worst["station_name"],
+        "station_key": worst["station_key"],
+        "platforms_affected": len(run),
+        "waited_seconds": round(worst["waited"]),
+        "scheduled_headway_seconds": round(worst["headway"]),
+        "next_train_seconds": None if worst["next_in"] is None else round(worst["next_in"]),
+        "message": f"{where} at {worst['station_name']} in {int(worst['waited'] // 60)} min",
+    }
+
+
+def detected_delays(
+    waits: list[dict], headways: dict[str, dict[int, float]], gaps: list[tuple], now: datetime
+) -> dict[str, list[dict]]:
+    """Our own inference, separate from TTC alerts: at least two adjacent platforms in one
+    direction have gone far longer than the scheduled headway without a train, with no
+    train about to arrive and no collection gap that could explain the silence."""
+    runs, run = [], []
+    for w in waits:
+        headway = headways.get(w["route_id"], {}).get(w["direction_id"])
+        flagged = None
+        if headway and w["last_arrival"] is not None:
+            waited = (now - w["last_arrival"]).total_seconds()
+            next_in = (w["next_arrival"] - now).total_seconds() if w["next_arrival"] else None
+            blind = any(start < now and end > w["last_arrival"] for start, end in gaps)
+            if (
+                waited > max(2 * headway, headway + 300)
+                and (next_in is None or next_in > 60)
+                and not blind
+            ):
+                flagged = {**w, "waited": waited, "next_in": next_in, "headway": headway}
+        adjacent = (
+            flagged
+            and run
+            and (flagged["route_id"], flagged["direction_id"])
+            == (run[-1]["route_id"], run[-1]["direction_id"])
+            and flagged["stop_order"] == run[-1]["stop_order"] + 1
+        )
+        if not adjacent:
+            runs.append(run)
+            run = []
+        if flagged:
+            run.append(flagged)
+    runs.append(run)
+    incidents = {}
+    for r in runs:
+        if len(r) >= 2:
+            incidents.setdefault(r[0]["route_id"], []).append(_incident(r))
+    return incidents
+
+
+def reliability(conn, now: datetime) -> dict:
+    today = service_date(now)
+    week_start = today - timedelta(days=6)
+    longest = conn.execute(
+        """SELECT route_id, gap_rank, direction_id, towards, station_key, station_name,
+                  platform, gap_start, gap_end, gap_seconds, scheduled_headway_seconds
+           FROM analytics.ttc_longest_gaps
+           WHERE service_date = %s AND gap_rank <= 5 ORDER BY route_id::int, gap_rank""",
+        (today,),
+    ).fetchall()
+    hourly = conn.execute(
+        """SELECT route_id, service_hour,
+                  sum(observed_headways) FILTER (WHERE service_date = %(today)s) AS today_n,
+                  sum(regular_headways) FILTER (WHERE service_date = %(today)s)
+                    AS today_regular,
+                  sum(compared_headways) FILTER (WHERE service_date = %(today)s)
+                    AS today_compared,
+                  sum(long_gaps) FILTER (WHERE service_date = %(today)s) AS today_long,
+                  sum(regular_headways) AS week_regular,
+                  sum(compared_headways) AS week_compared,
+                  sum(long_gaps) AS week_long,
+                  round(avg(median_headway_seconds)) AS week_median,
+                  round(avg(scheduled_headway_seconds)) AS week_scheduled
+           FROM analytics.ttc_headway_reliability_hourly
+           WHERE service_date BETWEEN %(start)s AND %(today)s
+           GROUP BY 1, 2 ORDER BY route_id::int, service_hour""",
+        {"today": today, "start": week_start},
+    ).fetchall()
+    outages = conn.execute(
+        """SELECT station_key, station_name, device_type, header_text, first_seen_at,
+                  resolved_at, active, duration_minutes, began_before_collection
+           FROM analytics.ttc_elevator_outages
+           WHERE active OR resolved_at >= %s
+           ORDER BY active DESC, duration_minutes DESC""",
+        (now - timedelta(days=7),),
+    ).fetchall()
+    coverage = conn.execute(
+        """SELECT min(service_date) AS first_day, count(DISTINCT service_date) AS days,
+                  count(*) AS headways
+           FROM analytics.ttc_headways"""
+    ).fetchone()
+    built = conn.execute(
+        "SELECT max(finished_at) AS at FROM ops.transformation_runs WHERE status = 'succeeded'"
+    ).fetchone()["at"]
+
+    def pct(part, whole):
+        return round(100 * part / whole) if whole else None
+
+    by_line = {}
+    for r in hourly:
+        by_line.setdefault(r["route_id"], []).append(
+            {
+                "hour": r["service_hour"],
+                "today_regular_pct": pct(r["today_regular"], r["today_compared"]),
+                "today_long_gaps": r["today_long"],
+                "today_headways": r["today_n"],
+                "week_regular_pct": pct(r["week_regular"], r["week_compared"]),
+                "week_long_gaps": r["week_long"],
+                "week_median_headway_seconds": r["week_median"],
+                "week_scheduled_headway_seconds": r["week_scheduled"],
+            }
+        )
+    resolved = sorted(o["duration_minutes"] for o in outages if not o["active"])
+    return {
+        "service_date": today,
+        "analytics_built_at": built,
+        "coverage": coverage,
+        "longest_gaps_today": longest,
+        "hourly": by_line,
+        "outages": {
+            "active": [o for o in outages if o["active"]],
+            "resolved_last_7_days": len(resolved),
+            "median_resolved_minutes": resolved[len(resolved) // 2] if resolved else None,
+            "longest_resolved_minutes": resolved[-1] if resolved else None,
+        },
+    }

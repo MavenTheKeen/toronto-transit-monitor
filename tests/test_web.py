@@ -230,3 +230,84 @@ def test_health_and_page(client):
     assert "Toronto Transit Commission" in page.text
     assert "default-src 'self'" in page.headers["content-security-policy"]
     assert client.get("/static/app.js").status_code == 200
+
+
+def wait(order, waited, next_in=None, platform="Southbound", route="1", direction=0):
+    now = T0
+    return {
+        "route_id": route,
+        "direction_id": direction,
+        "stop_order": order,
+        "stop_id": f"s{order}",
+        "towards": "Vaughan Metropolitan Centre",
+        "station_name": f"Station {order}",
+        "station_key": f"station-{order}",
+        "platform": platform,
+        "last_arrival": now - timedelta(seconds=waited),
+        "next_arrival": None if next_in is None else now + timedelta(seconds=next_in),
+    }
+
+
+HEADWAYS = {"1": {0: 180}}  # Long gap threshold: max(360, 480) = 480 s.
+
+
+def test_detection_needs_two_adjacent_silent_platforms():
+    waits = [wait(2, 300), wait(3, 700), wait(4, 660, next_in=200), wait(5, 100)]
+    incidents = queries.detected_delays(waits, HEADWAYS, [], T0)
+    assert incidents["1"] == [
+        {
+            "direction_id": 0,
+            "towards": "Vaughan Metropolitan Centre",
+            "station": "Station 3",
+            "station_key": "station-3",
+            "platforms_affected": 2,
+            "waited_seconds": 700,
+            "scheduled_headway_seconds": 180,
+            "next_train_seconds": None,
+            "message": "No southbound train at Station 3 in 11 min",
+        }
+    ]
+    # One silent platform alone is not enough.
+    assert queries.detected_delays([wait(3, 700), wait(5, 700)], HEADWAYS, [], T0) == {}
+
+
+def test_detection_is_suppressed_by_imminent_train_gap_or_unknown_schedule():
+    waits = [wait(3, 700, next_in=30), wait(4, 700, next_in=45)]
+    assert queries.detected_delays(waits, HEADWAYS, [], T0) == {}
+    silent = [wait(3, 700), wait(4, 700)]
+    gap = [(T0 - timedelta(minutes=8), T0 - timedelta(minutes=5))]
+    assert queries.detected_delays(silent, HEADWAYS, gap, T0) == {}
+    assert queries.detected_delays(silent, {}, [], T0) == {}
+    towards = [wait(3, 700, platform="Subway"), wait(4, 700, platform="Subway")]
+    message = queries.detected_delays(towards, HEADWAYS, [], T0)["1"][0]["message"]
+    assert message == "No train towards Vaughan Metropolitan Centre at Station 3 in 11 min"
+
+
+def test_detected_status_only_when_ttc_reports_nothing():
+    line_list = [{"id": "1", "name": "Line 1"}, {"id": "2", "name": "Line 2"}]
+    alerts = [
+        {
+            "id": "a",
+            "kind": "service",
+            "timing": "active",
+            "lines": ["2"],
+            "status": "delays",
+            "header": "Delays",
+        }
+    ]
+    detected = {
+        "1": [{"message": "No southbound train at X in 11 min"}],
+        "2": [{"message": "No westbound train at Y in 9 min"}],
+    }
+    one, two = queries.line_statuses(line_list, alerts, {"stale": False}, detected)
+    assert one["status"] == "normal"
+    assert one["detected"]["label"] == "Possible delay, not confirmed by TTC"
+    assert one["detected"]["source"] == "detected"
+    assert two["status"] == "delays" and two["detected"] is None
+
+
+@pytest.mark.integration
+def test_reliability_endpoint_reports_analytics_not_built(client, settings):
+    with connect(settings.database_url) as conn:
+        conn.execute("DROP TABLE IF EXISTS analytics.ttc_longest_gaps")
+    assert client.get("/api/reliability").json()["available"] is False

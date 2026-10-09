@@ -81,18 +81,37 @@ function alertCard(alert) {
   );
 }
 
+// Reported (TTC alerts) and detected (our inference) are always labelled separately.
+function statusDetails(status) {
+  const detected = status.detected;
+  return [
+    el("div", {}, el("span", { class: "tag" }, "Reported"), statusPill(status)),
+    status.summary ? el("p", { class: "muted" }, status.summary) : null,
+    detected
+      ? el(
+          "div",
+          { class: "detected" },
+          el("span", { class: "tag" }, "Detected"),
+          el("span", { class: "pill detected" }, detected.label),
+          detected.incidents.map((i) =>
+            el(
+              "p",
+              {},
+              el("a", { href: `#/station/${i.station_key}` }, i.message),
+              el("span", { class: "muted" }, ` (scheduled every ${minutesText(i.scheduled_headway_seconds)})`),
+            ),
+          ),
+        )
+      : null,
+  ];
+}
+
 function statusRow(status) {
   return el(
     "li",
     { class: "card status-row" },
     badge(status.line),
-    el(
-      "div",
-      {},
-      el("a", { class: "name", href: `#/line/${status.line}` }, status.name),
-      el("div", {}, el("span", { class: "tag" }, "Reported"), statusPill(status)),
-      status.summary ? el("p", { class: "muted" }, status.summary) : null,
-    ),
+    el("div", {}, el("a", { class: "name", href: `#/line/${status.line}` }, status.name), statusDetails(status)),
   );
 }
 
@@ -181,7 +200,7 @@ async function renderLine(id) {
   });
   return [
     el("h1", {}, badge(data.line.id, false), " ", data.line.name),
-    el("div", { class: "card" }, el("span", { class: "tag" }, "Reported"), statusPill(data.status), data.status.summary ? el("p", { class: "muted" }, data.status.summary) : null),
+    el("div", { class: "card" }, statusDetails(data.status)),
     staleNotice(data.predictions_as_of, "Train predictions"),
     el("div", { class: "legend" }, el("span", {}, dir0 ? `↓ towards ${dir0.towards}` : ""), el("span", {}, dir1 ? `towards ${dir1.towards} ↑` : "")),
     strip,
@@ -196,7 +215,7 @@ async function renderStation(key) {
   const bikes = data.bike_share;
   return [
     el("h1", {}, station.name, " ", station.lines.map((l) => [badge(l), " "])),
-    data.line_status.map((s) => el("div", { class: "card" }, badge(s.line), " ", el("span", { class: "tag" }, "Reported"), statusPill(s), s.summary ? el("p", { class: "muted" }, s.summary) : null)),
+    data.line_status.map((s) => el("div", { class: "card status-row" }, badge(s.line), el("div", {}, statusDetails(s)))),
     staleNotice(data.predictions_as_of, "Train predictions"),
     el("h2", {}, "Next trains"),
     station.directions.map((d) =>
@@ -219,16 +238,164 @@ async function renderStation(key) {
   ];
 }
 
+function hourLabel(hour) {
+  const h = hour % 24;
+  const label = `${h % 12 || 12} ${h < 12 ? "a.m." : "p.m."}`;
+  return hour >= 24 ? `${label} (late)` : label;
+}
+
+function meter(pct) {
+  if (pct === null || pct === undefined) return el("span", { class: "muted" }, "–");
+  return el(
+    "span",
+    { class: "meter", role: "img", "aria-label": `${pct}%` },
+    el("span", { class: "fill", style: { width: `${pct}%` } }),
+    el("span", { class: "value", "aria-hidden": "true" }, `${pct}%`),
+  );
+}
+
+function durationText(minutes) {
+  const h = Math.floor(minutes / 60);
+  return h ? `${h} h ${minutes % 60} min` : `${minutes} min`;
+}
+
+async function renderReliability() {
+  const data = await api("/api/reliability");
+  if (!data.available) {
+    return [
+      el("h1", {}, "Reliability"),
+      el("p", {}, "Reliability analytics have not been built yet. They appear after the first scheduled transformation."),
+    ];
+  }
+  const coverage = data.coverage;
+  const sections = [
+    el("h1", {}, "Reliability"),
+    el(
+      "p",
+      { class: "muted" },
+      `Measured from ${coverage.headways.toLocaleString("en-CA")} gaps between observed train arrivals since ${coverage.first_day}. History starts when collection started. `,
+      data.analytics_built_at ? `Analytics updated ${timeFmt.format(new Date(data.analytics_built_at))}` : "",
+    ),
+    el("h2", {}, "Longest gaps between trains today"),
+  ];
+  for (const line of lines) {
+    const gaps = data.longest_gaps_today.filter((g) => g.route_id === line.id);
+    sections.push(
+      el(
+        "section",
+        { class: "card" },
+        el("h3", {}, badge(line.id, false), ` ${line.name}`),
+        gaps.length
+          ? el(
+              "ol",
+              { class: "gaps" },
+              gaps.map((g) =>
+                el(
+                  "li",
+                  {},
+                  el("strong", {}, `${(g.gap_seconds / 60).toFixed(1)} min`),
+                  " at ",
+                  el("a", { href: `#/station/${g.station_key}` }, g.station_name),
+                  ` towards ${g.towards}, ${timeFmt.format(new Date(g.gap_start))}–${timeFmt.format(new Date(g.gap_end))}`,
+                  g.scheduled_headway_seconds
+                    ? el("span", { class: "muted" }, ` · scheduled every ${minutesText(g.scheduled_headway_seconds)}`)
+                    : null,
+                ),
+              ),
+            )
+          : el("p", { class: "muted" }, "No measurable gaps yet today."),
+      ),
+    );
+  }
+  sections.push(
+    el("h2", {}, "Headway reliability by hour"),
+    el(
+      "p",
+      { class: "muted" },
+      "Share of gaps between trains within 1.5 times the scheduled headway. A long gap exceeds twice the scheduled headway and the headway plus 5 minutes. Terminals are excluded.",
+    ),
+  );
+  for (const line of lines) {
+    const hours = data.hourly[line.id] || [];
+    sections.push(
+      el(
+        "section",
+        { class: "card" },
+        el("h3", {}, badge(line.id, false), ` ${line.name}`),
+        hours.length
+          ? el(
+              "table",
+              { class: "hours" },
+              el(
+                "thead",
+                {},
+                el(
+                  "tr",
+                  {},
+                  el("th", { scope: "col" }, "Hour"),
+                  el("th", { scope: "col" }, "Today"),
+                  el("th", { scope: "col" }, "Last 7 days"),
+                  el("th", { scope: "col" }, "Long gaps today"),
+                ),
+              ),
+              el(
+                "tbody",
+                {},
+                hours.map((h) =>
+                  el(
+                    "tr",
+                    {},
+                    el("th", { scope: "row" }, hourLabel(h.hour)),
+                    el("td", {}, meter(h.today_regular_pct)),
+                    el("td", {}, meter(h.week_regular_pct)),
+                    el("td", {}, h.today_long_gaps === null ? "–" : h.today_long_gaps),
+                  ),
+                ),
+              ),
+            )
+          : el("p", { class: "muted" }, "No data yet."),
+      ),
+    );
+  }
+  const outages = data.outages;
+  const resolvedText =
+    outages.median_resolved_minutes === null
+      ? ""
+      : ` (median ${durationText(outages.median_resolved_minutes)}, longest ${durationText(outages.longest_resolved_minutes)})`;
+  sections.push(
+    el("h2", {}, "Elevator and escalator outages"),
+    el("p", {}, `${outages.active.length} out of service now. Resolved in the last 7 days: ${outages.resolved_last_7_days}${resolvedText}.`),
+    el(
+      "ul",
+      { class: "card plain" },
+      outages.active.map((o) =>
+        el(
+          "li",
+          {},
+          el("a", { href: `#/station/${o.station_key}` }, o.station_name),
+          ` · ${o.device_type} · `,
+          o.began_before_collection ? `at least ${durationText(o.duration_minutes)}` : durationText(o.duration_minutes),
+        ),
+      ),
+    ),
+  );
+  return sections;
+}
+
 async function route() {
   const [, kind, id] = (location.hash || "#/").split("/");
   try {
     if (!lines.length) {
       lines = (await api("/api/lines")).lines;
-      document.getElementById("line-nav").replaceChildren(...lines.map((l) => badge(l.id)));
+      document.getElementById("line-nav").replaceChildren(
+        ...lines.map((l) => badge(l.id)),
+        el("a", { href: "#/reliability", class: "navlink" }, "Reliability"),
+      );
     }
     let content;
     if (kind === "line" && id) content = await renderLine(id);
     else if (kind === "station" && id) content = await renderStation(id);
+    else if (kind === "reliability") content = await renderReliability();
     else content = await renderHome();
     main.replaceChildren(...[content].flat(Infinity).filter(Boolean));
     updated.textContent = `Updated ${timeFmt.format(new Date())}`;
