@@ -137,6 +137,19 @@ docker compose logs --tail 20 ttc-collector
 See [TTC subway collection](docs/ttc.md) for sources, data model, validation rules,
 and the source quirks found in the live feed. Data: Toronto Transit Commission.
 
+## Public subway site
+
+A FastAPI service exposes read-only JSON endpoints and a mobile-first page: service
+status per line, active alerts and planned closures, a line diagram with estimated
+train positions and unusually long gaps, and station pages with next arrivals,
+elevator/escalator outages and the nearest Bike Share dock.
+
+```powershell
+docker compose up -d web
+```
+
+Open **<http://localhost:8000>**. See [public site and API](docs/site.md).
+
 ## Tests and native development
 
 Ordinary tests use two documented real station extracts and controlled mutations,
