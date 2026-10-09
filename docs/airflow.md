@@ -67,6 +67,13 @@ Standalone does not restart an individual child process that dies. If its health
 check fails, inspect logs then run `docker compose restart airflow`. Docker's
 restart policy restarts exited containers, not merely unhealthy containers.
 
+The scheduler is one such process: when PostgreSQL restarts, it exits on the dropped
+connection and scheduled runs stop while the container keeps running. Compose
+therefore restarts Airflow whenever it restarts or recreates PostgreSQL
+(`depends_on: restart: true`). If PostgreSQL restarts any other way (a crash, or
+Docker restarting it), restart Airflow by hand; the [pipeline status
+page](site.md) shows Bike Share collection as delayed within 15 minutes.
+
 The UI is intentionally local: the host port binds to `127.0.0.1`, and the built-in
 Simple Auth Manager allows all local visitors to act as admins. This is not a
 public deployment configuration. DAG code is baked into the image; rebuild after

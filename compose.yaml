@@ -179,6 +179,10 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+        # Standalone's scheduler exits on a dropped database connection and is not
+        # restarted inside the container, so restart Airflow whenever Compose restarts
+        # or recreates PostgreSQL.
+        restart: true
       init-db:
         condition: service_completed_successfully
       airflow-db-init:
