@@ -122,6 +122,21 @@ docker compose --profile airflow down
 
 Do not add `--volumes` unless you intend to delete the collected database history.
 
+## TTC subway collection
+
+A second always-on service collects TTC subway predictions and service alerts from
+TTC's public GTFS-Realtime feeds every 30 seconds, keyed to a versioned copy of TTC's
+static GTFS. It keeps the same raw -> validated -> normalized pattern, logs every
+rejected or flagged record to `ops`, and applies a retention policy.
+
+```powershell
+docker compose up -d ttc-collector
+docker compose logs --tail 20 ttc-collector
+```
+
+See [TTC subway collection](docs/ttc.md) for sources, data model, validation rules,
+and the source quirks found in the live feed. Data: Toronto Transit Commission.
+
 ## Tests and native development
 
 Ordinary tests use two documented real station extracts and controlled mutations,
