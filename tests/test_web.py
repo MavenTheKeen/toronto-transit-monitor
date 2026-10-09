@@ -59,6 +59,12 @@ def test_long_gap_needs_to_be_well_above_scheduled_headway():
     assert not any(g["long"] for g in queries.gaps(trains, {}))
 
 
+def test_line_display_name_drops_brackets_and_spaced_hyphens():
+    assert queries.display_name("Line 2 (Bloor - Danforth)", "2") == "Line 2 Bloor–Danforth"
+    assert queries.display_name("Line 1 (Yonge-University)", "1") == "Line 1 Yonge–University"
+    assert queries.display_name("Sheppard", "4") == "Sheppard"
+
+
 def test_line_status_takes_most_severe_active_service_alert():
     line_list = [{"id": "1", "name": "Line 1"}, {"id": "2", "name": "Line 2"}]
     alerts = [

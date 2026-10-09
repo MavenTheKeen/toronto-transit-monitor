@@ -2,6 +2,7 @@
 current time, so results are deterministic in tests."""
 
 import math
+import re
 from datetime import datetime, timedelta
 
 from bikeshare.ttc.realtime import TORONTO, service_date
@@ -46,6 +47,14 @@ def freshness(state: dict, feed: str, now: datetime, limit: timedelta) -> dict:
     return {"as_of": as_of, "stale": as_of is None or now - as_of > limit}
 
 
+def display_name(long_name: str, short_name: str) -> str:
+    """'Line 2 (Bloor - Danforth)' -> 'Line 2 Bloor–Danforth'."""
+    match = re.fullmatch(r"Line\s*\w+\s*\((.+)\)", long_name.strip())
+    if not match:
+        return long_name.strip()
+    return f"Line {short_name} " + re.sub(r"\s*-\s*", "–", match.group(1).strip())
+
+
 def lines(conn, version: str) -> list[dict]:
     rows = conn.execute(
         """SELECT r.route_id, r.short_name, r.long_name, r.color, r.text_color,
@@ -62,7 +71,7 @@ def lines(conn, version: str) -> list[dict]:
             r["route_id"],
             {
                 "id": r["route_id"],
-                "name": r["long_name"],
+                "name": display_name(r["long_name"], r["short_name"]),
                 "short_name": r["short_name"],
                 "color": f"#{r['color']}" if r["color"] else None,
                 "text_color": f"#{r['text_color']}" if r["text_color"] else None,

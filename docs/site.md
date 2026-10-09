@@ -14,8 +14,8 @@ Open <http://localhost:8000>. Pages use hash routes: `#/` (service status), `#/l
 | --- | --- | --- | --- |
 | ![Service status](screenshots/site-home.png) | ![Line 1 diagram](screenshots/site-line1.png) | ![Bloor-Yonge](screenshots/site-station.png) | ![Reliability](screenshots/site-reliability.png) |
 
-Screenshots were captured from real data on 2026-10-09 (reliability at 10:47 Toronto
-time, about 80 minutes after collection started).
+Screenshots were captured from real data on 2026-10-09 at about 11:10 Toronto time,
+about 1 h 45 min after collection started.
 
 ## Endpoints
 
@@ -66,4 +66,7 @@ Reliability metrics and detected delays are defined in [reliability analytics](r
 
 Semantic headings and lists, a skip link, visible focus, text equivalents for the line
 diagram (train lists and gap summaries), status text that never relies on colour alone,
-light and dark themes, and reduced motion respected.
+light and dark themes, and reduced motion respected. The page refreshes every 20 seconds
+while visible; a refresh keeps typed search text, focus, open panels and scroll
+position, and a failed refresh keeps the last data on screen with a notice instead of
+replacing it with an error.
