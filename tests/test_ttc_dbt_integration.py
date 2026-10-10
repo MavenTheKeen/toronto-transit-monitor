@@ -140,3 +140,11 @@ def test_ttc_reliability_models(settings):
             ("E", 300),
         ]
         assert len(rows) == 5
+
+    # A full refresh (after a column change) rebuilds the same rows from retained visits.
+    assert (
+        run_transform(settings.database_url, executable, "dbt", full_refresh=True)["status"]
+        == "succeeded"
+    )
+    with connect(settings.database_url) as conn:
+        assert conn.execute("SELECT count(*) AS n FROM analytics.ttc_headways").fetchone()["n"] == 5

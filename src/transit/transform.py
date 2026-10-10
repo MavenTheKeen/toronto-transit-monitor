@@ -34,7 +34,9 @@ def dbt_environment(database_url: str) -> dict[str, str]:
     return env
 
 
-def run_transform(database_url: str, executable="dbt", project_dir="dbt") -> dict:
+def run_transform(
+    database_url: str, executable="dbt", project_dir="dbt", full_refresh=False
+) -> dict:
     project = Path(project_dir).resolve()
     if not (project / "dbt_project.yml").is_file():
         raise ValueError(f"dbt project not found: {project}")
@@ -70,6 +72,7 @@ def run_transform(database_url: str, executable="dbt", project_dir="dbt") -> dic
                             artifacts,
                             "--log-path",
                             str(Path(artifacts) / "logs"),
+                            *(["--full-refresh"] if full_refresh else []),
                         ],
                         env=dbt_environment(database_url),
                         check=False,

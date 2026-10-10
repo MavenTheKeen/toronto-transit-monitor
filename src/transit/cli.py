@@ -32,6 +32,11 @@ def main():
     transform = commands.add_parser("transform", help="Run isolated dbt build and record results")
     transform.add_argument("--dbt-executable", default="dbt")
     transform.add_argument("--project-dir", default="dbt")
+    transform.add_argument(
+        "--full-refresh",
+        action="store_true",
+        help="Rebuild incremental models from retained data (after changing their columns)",
+    )
     commands.add_parser("ttc-gtfs-refresh", help="Load TTC static GTFS if it changed")
     ttc_collect = commands.add_parser("ttc-collect", help="Poll TTC realtime feeds every 30 s")
     ttc_collect.add_argument("--once", action="store_true", help="Poll each feed once and exit")
@@ -96,7 +101,9 @@ def main():
                     )
                     result["readonly_role"] = WEB_DB_ROLE
             elif args.command == "transform":
-                result = run_transform(settings.database_url, args.dbt_executable, args.project_dir)
+                result = run_transform(
+                    settings.database_url, args.dbt_executable, args.project_dir, args.full_refresh
+                )
             else:
                 result = run(settings, args.collection_id, replay=args.command == "replay")
         print(json.dumps(result, default=str))

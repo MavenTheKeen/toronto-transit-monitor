@@ -59,6 +59,15 @@ reverse question, long gaps this project saw that TTC did not log, needs care: m
 holds are never logged. The model is empty until TTC publishes a month this project
 collected (collection began 2026-10-09; October should appear in late November).
 
+## Changing incremental models
+
+`ttc_headways` and `ttc_scheduled_service` are incremental with `on_schema_change: fail`,
+so a build stops rather than silently mixing old and new columns. After changing their
+columns, rebuild once with `transit transform --full-refresh` (recorded in
+`ops.transformation_runs` like any build). A full refresh rebuilds headways from the
+train visits still retained (90 days), so history older than that would be lost; past
+that point, add the column with a migration-style `ALTER TABLE` and backfill instead.
+
 ## Tests
 
 Structural tests (unique keys, not null, accepted values, relationships) and model
