@@ -34,6 +34,7 @@ with coverage as (
        and h.route_id = w.route_id
        and (w.bound is null or split_part(h.platform, ' ', 1) = w.bound)
        and not h.implausible
+       and not h.outside_service
        and h.previous_arrival_at < w.window_end
        and h.arrived_at > w.window_start
     group by w.source_id

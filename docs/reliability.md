@@ -14,7 +14,7 @@ started. They are estimates from predicted arrival times, not official TTC stati
 | `staging.stg_ttc_platforms` | view | Platforms of the newest static GTFS version, with line order and a terminal flag. |
 | `staging.stg_ttc_arrivals` | view | Train visits marked passed, with station and service hour (hours since local midnight of the service day; can exceed 23 after midnight, like GTFS). |
 | `staging.stg_ttc_collection_gaps` | view | Periods over 2 minutes without a new trip-update snapshot. |
-| `analytics.ttc_headways` | incremental | Time since the previous train at the same platform and service day, with `implausible` (under 60 s) and `spans_collection_gap` flags. Keeps history after train visits expire; each run rebuilds the last two service days. |
+| `analytics.ttc_headways` | incremental | Time since the previous train at the same platform and service day, with `implausible` (under 60 s), `spans_collection_gap` and `outside_service` (a train passed more than 10 minutes before the platform's first scheduled train or 30 minutes after its last, such as a work train before opening, so the gap spans the overnight closure) flags. Keeps history after train visits expire; each run rebuilds the last two service days. |
 | `analytics.ttc_scheduled_service` | incremental | Scheduled trains per platform and service hour on each observed day, using the static GTFS version whose calendar covers that day. |
 | `analytics.ttc_headway_reliability_hourly` | table | Observed versus scheduled headways per line, direction, day and hour. |
 | `analytics.ttc_longest_gaps` | table | Ten longest gaps per line and day. |

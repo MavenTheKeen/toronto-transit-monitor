@@ -11,6 +11,7 @@ with measured as (
         and not h.is_terminal
         and not h.implausible
         and not h.spans_collection_gap
+        and not h.outside_service
 ), incidents as (
     select
         *,

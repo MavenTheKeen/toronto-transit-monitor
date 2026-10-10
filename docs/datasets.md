@@ -24,8 +24,9 @@ and renamed into place, sidecar last, so a sidecar means its files are complete.
 Days with no data are skipped rather than written empty.
 
 Headway rows come from the dbt model `analytics.ttc_headways`, including rows flagged
-`implausible` (two labels for one train) or `spans_collection_gap` (the collector was
-down), so users can apply the same exclusions as the site or not. Bike Share rows come
+`implausible` (two labels for one train), `spans_collection_gap` (the collector was
+down) or `outside_service` (a work train before service started, so the gap spans the
+overnight closure), so users can apply the same exclusions as the site or not. Bike Share rows come
 from `normalized.station_observations`; apply the 30-minute freshness rule in
 [metric definitions](metrics.md) before treating a count as current.
 
@@ -36,7 +37,8 @@ import duckdb
 duckdb.sql("""
     SELECT route_id, towards, median(headway_seconds) / 60 AS median_minutes
     FROM 'ttc-headways/2026-10-10.parquet'
-    WHERE NOT implausible AND NOT spans_collection_gap AND NOT is_terminal
+    WHERE NOT implausible AND NOT spans_collection_gap AND NOT outside_service
+      AND NOT is_terminal
     GROUP BY ALL ORDER BY ALL
 """).show()
 ```

@@ -66,6 +66,10 @@ models:
       - name: spans_collection_gap
         data_tests:
           - not_null
+      - name: outside_service
+        description: A train passed more than 10 minutes before the platform's first scheduled train or 30 minutes after its last (a work or positioning train), so the gap spans the overnight closure.
+        data_tests:
+          - not_null
 
   - name: ttc_scheduled_service
     description: Scheduled trains per platform and service hour, using the GTFS version covering each date.

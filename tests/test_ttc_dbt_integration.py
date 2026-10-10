@@ -57,6 +57,14 @@ def test_ttc_reliability_models(settings):
         pytest.skip("Set DBT_EXECUTABLE to the isolated dbt executable")
     with connect(settings.database_url) as conn:
         static_gtfs.load(conn, static_gtfs.parse(static_zip()), "test://gtfs", T0)
+        # W is a work train at 05:50, before Wellesley's first scheduled train (06:06).
+        arrive(conn, "W", SIX_AM - timedelta(minutes=10))
+        for minutes in range(9, 0, -1):  # Empty polls: the collector kept running.
+            when = SIX_AM - timedelta(minutes=minutes)
+            snapshot_id, _ = store.store_snapshot(
+                conn, "trips_subway", "test://", trip_feed(when, []), when
+            )
+            store.normalize_snapshot(conn, snapshot_id)
         for train, offset in (("A", 0), ("B", 180), ("C", 210), ("D", 900)):
             arrive(conn, train, SIX_AM + timedelta(seconds=offset))
         outage = alert_feed(
@@ -88,16 +96,22 @@ def test_ttc_reliability_models(settings):
 
     with connect(settings.database_url) as conn:
         headways = conn.execute(
-            """SELECT train_id, previous_train_id, headway_seconds, implausible, service_hour
+            """SELECT train_id, headway_seconds, implausible, outside_service,
+                      spans_collection_gap, service_hour
                FROM analytics.ttc_headways ORDER BY arrived_at"""
         ).fetchall()
-        assert [(h["train_id"], h["headway_seconds"], h["implausible"]) for h in headways] == [
-            ("A", None, False),
-            ("B", 180, False),
-            ("C", 30, True),  # Two trains 30 s apart: excluded from metrics.
-            ("D", 690, False),
+        assert [
+            (h["train_id"], h["headway_seconds"], h["implausible"], h["outside_service"])
+            for h in headways
+        ] == [
+            ("W", None, False, False),
+            ("A", 600, False, True),  # Gap after the work train: not a delay, excluded.
+            ("B", 180, False, False),
+            ("C", 30, True, False),  # Two trains 30 s apart: excluded from metrics.
+            ("D", 690, False, False),
         ]
-        assert {h["service_hour"] for h in headways} == {6}
+        assert [h["service_hour"] for h in headways] == [5, 6, 6, 6, 6]
+        assert not any(h["spans_collection_gap"] for h in headways)
         hourly = conn.execute("SELECT * FROM analytics.ttc_headway_reliability_hourly").fetchall()
         assert len(hourly) == 1
         row = hourly[0]
@@ -139,7 +153,7 @@ def test_ttc_reliability_models(settings):
             ("D", 690),
             ("E", 300),
         ]
-        assert len(rows) == 5
+        assert len(rows) == 6
 
     # A full refresh (after a column change) rebuilds the same rows from retained visits.
     assert (
@@ -147,4 +161,4 @@ def test_ttc_reliability_models(settings):
         == "succeeded"
     )
     with connect(settings.database_url) as conn:
-        assert conn.execute("SELECT count(*) AS n FROM analytics.ttc_headways").fetchone()["n"] == 5
+        assert conn.execute("SELECT count(*) AS n FROM analytics.ttc_headways").fetchone()["n"] == 6

@@ -1,7 +1,7 @@
 {{ config(materialized='table') }}
 -- Observed versus scheduled headways per line, direction and service hour. Only
--- measurable headways count: not at terminals, not implausibly short, and not spanning
--- a collection gap. A long gap uses the same rule as the live site: more than twice the
+-- measurable headways count: not at terminals, not implausibly short, not spanning
+-- a collection gap, and not outside scheduled service. A long gap uses the same rule as the live site: more than twice the
 -- scheduled headway and more than the headway plus 5 minutes.
 with measured as (
     select h.*, s.scheduled_headway_seconds
@@ -12,6 +12,7 @@ with measured as (
         and not h.is_terminal
         and not h.implausible
         and not h.spans_collection_gap
+        and not h.outside_service
 )
 select
     service_date,

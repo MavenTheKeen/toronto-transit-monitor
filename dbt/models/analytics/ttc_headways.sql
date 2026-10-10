@@ -50,8 +50,27 @@ select
     exists (
         select 1 from {{ ref('stg_ttc_collection_gaps') }} g
         where g.gap_start < o.arrived_at and g.gap_end > o.previous_arrival_at
-    ) as spans_collection_gap
+    ) as spans_collection_gap,
+    -- A train passed more than 10 minutes before the platform's first scheduled train
+    -- or 30 minutes after its last: a work or positioning train, so the gap covers the
+    -- overnight closure rather than a delay.
+    o.previous_arrival_at is not null and coalesce(
+        o.previous_arrival_at < span.service_start - interval '10 minutes'
+            or o.arrived_at > span.service_end + interval '30 minutes',
+        true
+    ) as outside_service
 from ordered o
+left join lateral (
+    select
+        day_start + min(s.first_arrival_seconds) * interval '1 second' as service_start,
+        day_start + max(s.last_arrival_seconds) * interval '1 second' as service_end
+    from {{ ref('ttc_scheduled_service') }} s
+    cross join lateral (
+        select o.service_date::timestamp at time zone 'America/Toronto' as day_start
+    ) d
+    where s.service_date = o.service_date and s.stop_id = o.stop_id
+    group by day_start
+) span on true
 {% if is_incremental() %}
     where o.service_date >= {{ since }}
 {% endif %}

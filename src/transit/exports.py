@@ -35,14 +35,15 @@ DAILY = {
         "description": (
             "Every observed gap between consecutive trains at a subway platform. Arrivals "
             "are inferred from TTC's realtime predictions (see docs/ttc.md); rows flagged "
-            "implausible or spanning a collection gap are kept but marked."
+            "implausible, spanning a collection gap or outside scheduled service are kept "
+            "but marked."
         ),
         "day": "TTC service day: 04:00 to 04:00 Toronto time",
         "query": """
             SELECT service_date, service_hour, route_id, direction_id, towards, stop_id,
                    station_key, station_name, platform, is_terminal, train_id,
                    previous_train_id, previous_arrival_at, arrived_at, headway_seconds,
-                   implausible, spans_collection_gap
+                   implausible, spans_collection_gap, outside_service
             FROM analytics.ttc_headways WHERE service_date = %(day)s
             ORDER BY arrived_at, stop_id""",
         "time_column": "arrived_at",
@@ -64,6 +65,10 @@ DAILY = {
             "headway_seconds": "Seconds between the two arrivals",
             "implausible": "Under 60 s: usually one train reported under two labels",
             "spans_collection_gap": "The collector was down during the gap; not a delay",
+            "outside_service": (
+                "A train passed outside scheduled service (e.g. a work train before "
+                "opening); the gap spans the overnight closure, not a delay"
+            ),
         },
     },
     "bikeshare-availability": {
